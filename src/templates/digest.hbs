@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>AI News Digest</title>
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
 </head>
 <body style="margin:0;padding:0;background-color:#f5f5f5;font-family:-apple-system,'Helvetica Neue',Arial,sans-serif;">
   <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f5f5f5;padding:20px 0;">
@@ -15,7 +16,7 @@
           <tr>
             <td style="background-color:#1a1a2e;border-radius:8px 8px 0 0;padding:24px 32px;">
               <h1 style="margin:0;color:#ffffff;font-size:24px;font-weight:700;letter-spacing:-0.5px;">
-                🤖 AI News Digest
+                <span style="font-family:'Material Icons';font-size:28px;vertical-align:middle;line-height:1;font-weight:normal;font-style:normal;color:#ffffff;margin-right:8px;">smart_toy</span>AI News Digest
               </h1>
               <p style="margin:8px 0 0;color:#a0a0c0;font-size:14px;">
                 {{deliveryDate}} ・ {{totalCount}}件の記事
@@ -28,7 +29,7 @@
           <tr>
             <td style="background-color:#ffffff;padding:24px 32px;border-left:1px solid #e0e0e0;border-right:1px solid #e0e0e0;">
               <h2 style="margin:0 0 16px;font-size:16px;font-weight:700;color:#1a1a2e;border-left:4px solid #1a73e8;padding-left:12px;">
-                今日のトレンド
+                <span style="font-family:'Material Icons';font-size:20px;vertical-align:middle;line-height:1;font-weight:normal;font-style:normal;color:#1a73e8;margin-right:6px;">trending_up</span>今日のトレンド
               </h2>
               {{#each trends}}
               <div style="margin-bottom:12px;padding:12px 16px;background-color:#f8f9ff;border-radius:6px;">
@@ -45,7 +46,7 @@
           <tr>
             <td style="background-color:#ffffff;padding:24px 32px;border-left:1px solid #e0e0e0;border-right:1px solid #e0e0e0;border-top:1px solid #f0f0f0;">
               <h2 style="margin:0 0 16px;font-size:16px;font-weight:700;color:#1a1a2e;border-left:4px solid #34a853;padding-left:12px;">
-                {{name}} <span style="font-size:13px;font-weight:400;color:#888;">({{articles.length}}件)</span>
+                <span style="font-family:'Material Icons';font-size:20px;vertical-align:middle;line-height:1;font-weight:normal;font-style:normal;color:#34a853;margin-right:6px;">{{icon}}</span>{{name}} <span style="font-size:13px;font-weight:400;color:#888;">({{articles.length}}件)</span>
               </h2>
               {{#each articles}}
               <div style="margin-bottom:16px;padding:16px;border:1px solid #e8e8e8;border-radius:6px;background-color:#fafafa;">
@@ -69,8 +70,8 @@
                     {{sourceName}}
                   </span>
                   &nbsp;
-                  <a href="{{url}}" style="font-size:12px;color:#1a73e8;text-decoration:none;">
-                    → 記事を読む
+                  <a href="{{url}}" style="font-size:12px;color:#1a73e8;text-decoration:none;vertical-align:middle;">
+                    <span style="font-family:'Material Icons';font-size:14px;vertical-align:middle;line-height:1;font-weight:normal;font-style:normal;">open_in_new</span> 記事を読む
                   </a>
                 </p>
               </div>

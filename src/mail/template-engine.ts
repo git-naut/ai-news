@@ -45,6 +45,14 @@ function getTemplate(templateName: string): HandlebarsTemplateDelegate {
 /** カテゴリの表示順 */
 const CATEGORY_ORDER: Category[] = ['AI/LLM', 'Development', 'Tech', 'Japan'];
 
+/** カテゴリ → Material Icons アイコン名のマッピング */
+const CATEGORY_ICONS: Record<Category, string> = {
+  'AI/LLM': 'auto_awesome',
+  'Development': 'code',
+  'Tech': 'memory',
+  'Japan': 'language',
+};
+
 /**
  * Article の配列と Trend 配列から DigestTemplateData を構築する。
  */
@@ -65,6 +73,7 @@ export function buildTemplateData(
     .filter((cat) => grouped.has(cat))
     .map((cat) => ({
       name: cat,
+      icon: CATEGORY_ICONS[cat],
       articles: (grouped.get(cat) ?? []).map((a) => ({
         title: a.title,
         url: a.url,

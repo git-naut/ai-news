@@ -12,6 +12,8 @@ export interface ArticleTemplateData {
 /** テンプレートに渡すカテゴリセクションのデータ */
 export interface CategorySection {
   name: string;
+  /** Material Icons のアイコン名 */
+  icon: string;
   articles: ArticleTemplateData[];
 }
 
