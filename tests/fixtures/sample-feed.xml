@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/">
+  <channel>
+    <title>Test AI Blog</title>
+    <link>https://example.com</link>
+    <description>Test feed for AI news</description>
+    <item>
+      <title>GPT-5 Released with Major Improvements</title>
+      <link>https://example.com/gpt-5-release</link>
+      <pubDate>Mon, 23 Mar 2026 01:00:00 +0000</pubDate>
+      <description>OpenAI has released GPT-5 with significant performance improvements over its predecessor.</description>
+      <content:encoded><![CDATA[<p>OpenAI has released GPT-5 with significant performance improvements. The new model features improved reasoning capabilities and lower latency.</p>]]></content:encoded>
+    </item>
+    <item>
+      <title>New LLM Benchmark Results</title>
+      <link>https://example.com/llm-benchmark</link>
+      <pubDate>Mon, 23 Mar 2026 00:30:00 +0000</pubDate>
+      <description>Latest benchmark results for major language models show interesting trends.</description>
+    </item>
+    <item>
+      <title>Old Article from Last Week</title>
+      <link>https://example.com/old-article</link>
+      <pubDate>Mon, 16 Mar 2026 09:00:00 +0000</pubDate>
+      <description>This is an old article that should be filtered out.</description>
+    </item>
+  </channel>
+</rss>

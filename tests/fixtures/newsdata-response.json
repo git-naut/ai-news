@@ -1,0 +1,28 @@
+{
+  "status": "success",
+  "totalResults": 2,
+  "results": [
+    {
+      "article_id": "abc123",
+      "title": "New AI Model Breaks Performance Records",
+      "link": "https://techblog.example.com/ai-model-record",
+      "pubDate": "2026-03-23 01:00:00",
+      "source_name": "TechBlog",
+      "source_url": "https://techblog.example.com",
+      "content": "A new AI model has broken all previous performance benchmarks in natural language processing tasks.",
+      "description": "A new AI model has broken all previous performance benchmarks.",
+      "language": "english"
+    },
+    {
+      "article_id": "def456",
+      "title": "日本のAI研究が世界トップレベルに",
+      "link": "https://ainews.example.jp/japan-ai-research",
+      "pubDate": "2026-03-23 00:30:00",
+      "source_name": "AI News Japan",
+      "source_url": "https://ainews.example.jp",
+      "content": null,
+      "description": "日本のAI研究機関が最新の成果を発表し、世界から注目を集めています。",
+      "language": "japanese"
+    }
+  ]
+}

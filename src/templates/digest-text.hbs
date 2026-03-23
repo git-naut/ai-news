@@ -1,0 +1,25 @@
+AI News Digest
+==============
+{{deliveryDate}} - {{totalCount}}件の記事
+
+{{#if hasTrends}}
+【今日のトレンド】
+{{#each trends}}
+▸ {{trend}}
+  {{description}}
+{{/each}}
+
+{{/if}}
+{{#each categories}}
+━━ {{name}} ({{articles.length}}件) ━━━━━━━━━━━━━━━━━━━━━
+{{#each articles}}
+
+■ {{title}}
+  {{summary}}
+  → {{url}}
+  [{{sourceName}} / {{publishedAt}}]
+{{/each}}
+
+{{/each}}
+──────────────────────────────────────
+このメールは GitHub Actions によって自動送信されています。
