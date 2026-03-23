@@ -45,12 +45,12 @@ function getTemplate(templateName: string): HandlebarsTemplateDelegate {
 /** カテゴリの表示順 */
 const CATEGORY_ORDER: Category[] = ['AI/LLM', 'Development', 'Tech', 'Japan'];
 
-/** カテゴリ → Material Icons アイコン名のマッピング */
+/** カテゴリ → Unicode 記号のマッピング（フォント依存なし、全メールクライアント対応） */
 const CATEGORY_ICONS: Record<Category, string> = {
-  'AI/LLM': 'auto_awesome',
-  'Development': 'code',
-  'Tech': 'memory',
-  'Japan': 'language',
+  'AI/LLM': '◇',
+  'Development': '◈',
+  'Tech': '◉',
+  'Japan': '◎',
 };
 
 /**
