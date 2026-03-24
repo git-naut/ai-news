@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
@@ -20,9 +20,18 @@ vi.mock('axios', () => ({
 import axios from 'axios';
 import { fetchNewsApi } from '../../src/news-api/client.js';
 
+// フィクスチャの記事日付 (2026-03-23 01:00:00 UTC) が 24h フィルターを通るよう時刻を固定
+const FIXED_NOW = new Date('2026-03-23T10:00:00Z').getTime();
+
 describe('fetchNewsApi', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.useFakeTimers();
+    vi.setSystemTime(FIXED_NOW);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it('API から記事を取得して RawArticle に変換する', async () => {
