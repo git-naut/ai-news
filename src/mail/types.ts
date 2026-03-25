@@ -9,12 +9,19 @@ export interface ArticleTemplateData {
   publishedAt: string; // フォーマット済み文字列
 }
 
+/** 2カラムレイアウト用の記事ペア */
+export interface ArticlePair {
+  left: ArticleTemplateData;
+  right: ArticleTemplateData | null; // 奇数件数の末尾はnull
+}
+
 /** テンプレートに渡すカテゴリセクションのデータ */
 export interface CategorySection {
   name: string;
   /** Material Icons のアイコン名 */
   icon: string;
-  articles: ArticleTemplateData[];
+  articles: ArticleTemplateData[];     // テキストテンプレート用
+  articlePairs: ArticlePair[];         // 2カラムHTMLテンプレート用
 }
 
 /** Handlebars テンプレートに渡すデータ全体 */

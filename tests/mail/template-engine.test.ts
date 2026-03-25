@@ -63,6 +63,19 @@ describe('buildTemplateData', () => {
     const data = buildTemplateData(mockArticles, [], '2026年03月23日 09:00 JST');
     expect(data.hasTrends).toBe(false);
   });
+
+  it('articlePairs の数は ceil(articles.length / 2) に等しい', () => {
+    const data = buildTemplateData(mockArticles, [], '2026年03月23日 09:00 JST');
+    for (const cat of data.categories) {
+      expect(cat.articlePairs.length).toBe(Math.ceil(cat.articles.length / 2));
+    }
+  });
+
+  it('記事が1件の場合、articlePairs の right は null になる', () => {
+    const data = buildTemplateData(mockArticles, [], '2026年03月23日 09:00 JST');
+    const aiSection = data.categories.find((c) => c.name === 'AI/LLM');
+    expect(aiSection?.articlePairs[0]?.right).toBeNull();
+  });
 });
 
 describe('renderTemplate', () => {
@@ -79,6 +92,11 @@ describe('renderTemplate', () => {
     const text = renderTemplate('digest-text', data);
     expect(text).toContain('AI News Digest');
     expect(text).toContain('GPT-5 Released by OpenAI');
+  });
+
+  it('right が null の場合でもHTMLレンダリングが壊れない', () => {
+    const data = buildTemplateData(mockArticles, [], '2026年03月23日 09:00 JST');
+    expect(() => renderTemplate('digest', data)).not.toThrow();
   });
 });
 

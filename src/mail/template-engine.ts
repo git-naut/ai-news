@@ -5,7 +5,7 @@ import { dirname, join } from 'node:path';
 import { format } from 'date-fns';
 import { toZonedTime } from 'date-fns-tz';
 import { ja } from 'date-fns/locale';
-import type { DigestTemplateData } from './types.js';
+import type { DigestTemplateData, ArticlePair, ArticleTemplateData } from './types.js';
 import type { Article } from '../feeds/types.js';
 import type { Trend } from '../ai/trend-analyzer.js';
 import type { Category } from '../config/categories.js';
@@ -53,6 +53,15 @@ const CATEGORY_ICONS: Record<Category, string> = {
   'Japan': '◎',
 };
 
+/** 記事配列を2件ずつのペアに分割する（2カラムレイアウト用） */
+function pairArticles(articles: ArticleTemplateData[]): ArticlePair[] {
+  const pairs: ArticlePair[] = [];
+  for (let i = 0; i < articles.length; i += 2) {
+    pairs.push({ left: articles[i]!, right: articles[i + 1] ?? null });
+  }
+  return pairs;
+}
+
 /**
  * Article の配列と Trend 配列から DigestTemplateData を構築する。
  */
@@ -74,13 +83,16 @@ export function buildTemplateData(
     .map((cat) => ({
       name: cat,
       icon: CATEGORY_ICONS[cat],
-      articles: (grouped.get(cat) ?? []).map((a) => ({
-        title: a.title,
-        url: a.url,
-        sourceName: a.sourceName,
-        summary: a.summary ?? a.content?.slice(0, 150) ?? '（要約なし）',
-        publishedAt: format(toZonedTime(a.publishedAt, 'Asia/Tokyo'), 'MM/dd HH:mm'),
-      })),
+      ...((): { articles: ArticleTemplateData[]; articlePairs: ArticlePair[] } => {
+        const articles = (grouped.get(cat) ?? []).map((a): ArticleTemplateData => ({
+          title: a.title,
+          url: a.url,
+          sourceName: a.sourceName,
+          summary: a.summary ?? a.content?.slice(0, 150) ?? '（要約なし）',
+          publishedAt: format(toZonedTime(a.publishedAt, 'Asia/Tokyo'), 'MM/dd HH:mm'),
+        }));
+        return { articles, articlePairs: pairArticles(articles) };
+      })(),
     }));
 
   return {
