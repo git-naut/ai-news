@@ -20,8 +20,8 @@ const parser = new Parser<Record<string, unknown>, CustomItem>({
 /** 並列 HTTP 接続数の上限 */
 const REQUEST_CONCURRENCY = 5;
 
-/** 過去何時間以内の記事を対象とするか */
-const LOOKBACK_HOURS = 24;
+/** 過去何時間以内の記事を対象とするか（36h: 週明け月曜に土日分を取りこぼさないため） */
+const LOOKBACK_HOURS = 36;
 
 /**
  * 1つの RSS/Atom フィードを取得して RawArticle の配列を返す。

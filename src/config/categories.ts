@@ -4,11 +4,28 @@ export type Category = 'AI/LLM' | 'Development' | 'Tech' | 'Japan';
 /** カテゴリ判定に使用するキーワードリスト（小文字） */
 export const CATEGORY_KEYWORDS: Record<Category, string[]> = {
   'AI/LLM': [
-    'llm', 'gpt', 'claude', 'gemini', 'transformer', 'diffusion',
-    'fine-tuning', 'finetuning', 'rag', 'retrieval', 'agent', 'multimodal',
-    'embedding', 'openai', 'anthropic', 'deepmind', 'mistral', 'llama',
-    'stable diffusion', 'midjourney', 'chatgpt', 'copilot', 'sora',
-    '生成ai', '大規模言語モデル', 'チャットgpt', '人工知能',
+    // 一般用語
+    'llm', 'large language model', 'foundation model', 'transformer',
+    'diffusion', 'fine-tuning', 'finetuning', 'rag', 'retrieval',
+    'agent', 'multimodal', 'embedding', 'reasoning model',
+    // Anthropic: Claude Opus 4.6 / Claude Sonnet 4.6 / Claude Haiku 4.5
+    'anthropic', 'claude',
+    // OpenAI: GPT-5.4 / GPT-5.3 / o3
+    'openai', 'gpt', 'gpt-5', 'o3', 'chatgpt', 'sora', 'copilot',
+    // Google: Gemini 3.1 Pro / Gemini 3.1 Flash / Gemini 3
+    'deepmind', 'google deepmind', 'gemini',
+    // Meta: Llama 4 Scout / Llama 4 Maverick
+    'meta ai', 'llama', 'llama 4',
+    // Mistral AI: Mistral Large 3 / Mistral Small 4 / Devstral
+    'mistral', 'devstral',
+    // xAI: Grok 3 / Grok 4
+    'grok', 'xai',
+    // DeepSeek: DeepSeek-V3 / DeepSeek-R1
+    'deepseek', 'deepseek-r1', 'deepseek-v3',
+    // Microsoft: Phi-4 / Phi-4-reasoning / Phi-4-multimodal
+    'phi-4', 'microsoft phi',
+    // 日本語
+    '生成ai', '大規模言語モデル', 'チャットgpt', '人工知能', 'llm',
   ],
   'Development': [
     'typescript', 'javascript', 'python', 'rust', 'go', 'kubernetes',
