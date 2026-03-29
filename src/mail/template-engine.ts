@@ -53,6 +53,16 @@ const CATEGORY_ICONS: Record<Category, string> = {
   'Japan': '◎',
 };
 
+/**
+ * 記事の本文から最初の GitHub URL を抽出する。
+ * 見つからない場合は null を返す。
+ */
+function extractGithubUrl(content: string | null): string | null {
+  if (!content) return null;
+  const match = content.match(/https?:\/\/github\.com\/[^\s"'<>)]+/);
+  return match?.[0] ?? null;
+}
+
 /** 記事配列を2件ずつのペアに分割する（2カラムレイアウト用） */
 function pairArticles(articles: ArticleTemplateData[]): ArticlePair[] {
   const pairs: ArticlePair[] = [];
@@ -90,6 +100,7 @@ export function buildTemplateData(
           sourceName: a.sourceName,
           summary: a.summary ?? a.content?.slice(0, 150) ?? '（要約なし）',
           publishedAt: format(toZonedTime(a.publishedAt, 'Asia/Tokyo'), 'MM/dd HH:mm'),
+          githubUrl: extractGithubUrl(a.content),
         }));
         return { articles, articlePairs: pairArticles(articles) };
       })(),

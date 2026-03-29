@@ -3,11 +3,12 @@ AI News Digest
 {{deliveryDate}} - {{totalCount}}件の記事
 
 {{#if hasTrends}}
-【今日のトレンド】
+【今週のトレンド】
 {{#each trends}}
 ▸ {{trend}}
   {{description}}
-{{/each}}
+{{#if action}}  → 試す: {{action}}
+{{/if}}{{/each}}
 
 {{/if}}
 {{#each categories}}
@@ -16,7 +17,8 @@ AI News Digest
 
 ■ {{title}}
   {{summary}}
-  → {{url}}
+  → {{url}}{{#if githubUrl}}
+  [GitHub] {{githubUrl}}{{/if}}
   [{{sourceName}} / {{publishedAt}}]
 {{/each}}
 

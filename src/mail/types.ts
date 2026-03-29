@@ -7,6 +7,7 @@ export interface ArticleTemplateData {
   sourceName: string;
   summary: string;
   publishedAt: string; // フォーマット済み文字列
+  githubUrl: string | null; // 本文中に GitHub リンクがある場合のみ設定
 }
 
 /** 2カラムレイアウト用の記事ペア */

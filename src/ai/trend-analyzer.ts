@@ -5,8 +5,10 @@ import type { Article } from '../feeds/types.js';
 export interface Trend {
   /** トレンドのタイトル（短い見出し） */
   trend: string;
-  /** 1〜2文の説明 */
+  /** 1〜2文の技術的説明 */
   description: string;
+  /** エンジニアが今週試すべき具体的アクション（リポジトリ名・ツール名・APIなど） */
+  action?: string;
 }
 
 /**
@@ -25,9 +27,15 @@ export async function analyzeTrends(
     .join('\n');
 
   const prompt = `以下は本日の AI/テック ニュース ${Math.min(articles.length, 50)} 件のタイトルと要約です。
-これらを分析し、今日の主要なトレンドを3〜5個の観点で日本語で説明してください。
+これらを分析し、エンジニアが「今週押さえておくべき技術トレンド」を3〜5個、日本語で説明してください。
+観察の羅列ではなく、何を試せるか・何に備えるべきかを重視してください。
+
 必ず以下の JSON 配列形式のみで返すこと（コードブロックや説明文は不要）:
-[{"trend": "トレンドのタイトル（20文字以内）", "description": "1〜2文の説明"}]
+[{
+  "trend": "トレンドのタイトル（20文字以内）",
+  "description": "1〜2文の技術的説明",
+  "action": "試すための具体的アクション（リポジトリ名・ツール名・API名など。情報がなければ省略可）"
+}]
 
 ニュース一覧:
 ${articleSummaries}`;

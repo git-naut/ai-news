@@ -24,16 +24,19 @@
           </tr>
 
           {{#if hasTrends}}
-          <!-- トレンド分析 -->
+          <!-- 今週のトレンド（行動提案型） -->
           <tr>
             <td style="background-color:#ffffff;padding:16px 32px;border-left:1px solid #e0e0e0;border-right:1px solid #e0e0e0;">
               <h2 style="margin:0 0 12px;font-size:15px;font-weight:700;color:#1a1a2e;border-left:4px solid #1a73e8;padding-left:10px;">
-                ▲ 今日のトレンド
+                ▲ 今週のトレンド
               </h2>
               {{#each trends}}
               <div style="margin-bottom:8px;padding:10px 14px;background-color:#f8f9ff;border-radius:6px;">
                 <p style="margin:0 0 3px;font-size:13px;font-weight:600;color:#1a1a2e;">{{trend}}</p>
                 <p style="margin:0;font-size:12px;color:#555;line-height:1.6;">{{description}}</p>
+                {{#if action}}
+                <p style="margin:5px 0 0;font-size:11px;color:#1a73e8;font-weight:600;">→ 試す: {{action}}</p>
+                {{/if}}
               </div>
               {{/each}}
             </td>
@@ -61,7 +64,12 @@
                       </p>
                       <table width="100%" cellpadding="0" cellspacing="0">
                         <tr>
-                          <td><span style="font-size:10px;color:#888;background-color:#f0f0f0;padding:2px 5px;border-radius:3px;">{{left.sourceName}}</span></td>
+                          <td>
+                            <span style="font-size:10px;color:#888;background-color:#f0f0f0;padding:2px 5px;border-radius:3px;">{{left.sourceName}}</span>
+                            {{#if left.githubUrl}}
+                            <a href="{{left.githubUrl}}" style="font-size:10px;color:#fff;background-color:#24292e;padding:2px 5px;border-radius:3px;text-decoration:none;margin-left:4px;">GitHub</a>
+                            {{/if}}
+                          </td>
                           <td align="right"><span style="font-size:10px;color:#999;">{{left.publishedAt}}</span></td>
                         </tr>
                       </table>
@@ -79,7 +87,12 @@
                       </p>
                       <table width="100%" cellpadding="0" cellspacing="0">
                         <tr>
-                          <td><span style="font-size:10px;color:#888;background-color:#f0f0f0;padding:2px 5px;border-radius:3px;">{{right.sourceName}}</span></td>
+                          <td>
+                            <span style="font-size:10px;color:#888;background-color:#f0f0f0;padding:2px 5px;border-radius:3px;">{{right.sourceName}}</span>
+                            {{#if right.githubUrl}}
+                            <a href="{{right.githubUrl}}" style="font-size:10px;color:#fff;background-color:#24292e;padding:2px 5px;border-radius:3px;text-decoration:none;margin-left:4px;">GitHub</a>
+                            {{/if}}
+                          </td>
                           <td align="right"><span style="font-size:10px;color:#999;">{{right.publishedAt}}</span></td>
                         </tr>
                       </table>
