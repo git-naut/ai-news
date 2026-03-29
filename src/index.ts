@@ -64,11 +64,34 @@ async function main(): Promise<void> {
     console.warn('[ai-news] 取得できた記事が0件でした。空のダイジストを送信します。');
   }
 
-  // Step 4: メール生成・送信
+  // Step 4: メール生成
   const templateData = buildTemplateData(summarized, trends, deliveryDate);
   const html = renderTemplate('digest', templateData);
   const text = renderTemplate('digest-text', templateData);
 
+  // SEND_AT_UTC が指定されている場合、その時刻まで待機してから送信する
+  // （例: "00:00" → UTC 00:00 = JST 09:00 に送信）
+  // workflow_dispatch の場合は空文字列が渡されるため待機しない
+  const sendAtUtc = process.env.SEND_AT_UTC;
+  if (sendAtUtc) {
+    const parts = sendAtUtc.split(':').map(Number);
+    const targetHour = parts[0] ?? 0;
+    const targetMinute = parts[1] ?? 0;
+    const now = new Date();
+    const target = new Date(now);
+    target.setUTCHours(targetHour, targetMinute, 0, 0);
+    // 既に目標時刻を過ぎていた場合は翌日の同時刻
+    if (target.getTime() <= now.getTime()) {
+      target.setUTCDate(target.getUTCDate() + 1);
+    }
+    const sleepMs = target.getTime() - now.getTime();
+    if (sleepMs > 500) {
+      console.log(`[ai-news] UTC ${sendAtUtc} まで待機中 (${(sleepMs / 1000).toFixed(0)}秒)...`);
+      await new Promise((resolve) => setTimeout(resolve, sleepMs));
+    }
+  }
+
+  // Step 5: メール送信
   await sendEmail(
     { html, text, totalCount: summarized.length, deliveryDate },
     {

@@ -2,8 +2,8 @@ name: Daily AI News Digest
 
 on:
   schedule:
-    # UTC 00:00 = JST 09:00 (primary)
-    - cron: '0 0 * * *'
+    # UTC 23:50 = JST 08:50 (前処理開始、UTC 00:00 = JST 09:00 に送信)
+    - cron: '50 23 * * *'
     # UTC 04:00 = JST 13:00 (backup: primary がスキップされた場合のみ送信)
     - cron: '0 4 * * *'
   workflow_dispatch:
@@ -24,16 +24,27 @@ jobs:
             echo "should_send=true" >> $GITHUB_OUTPUT
             exit 0
           fi
-          TODAY=$(date -u +%Y-%m-%d)
-          echo "確認日付: $TODAY"
-          # 本日の成功ランを確認（現在のランは in-progress のため含まれない）
-          if gh run list --repo "$GITHUB_REPOSITORY" --workflow=daily-news.yml --status=success --limit=10 | grep -q "$TODAY"; then
-            echo "should_send=false" >> $GITHUB_OUTPUT
-            echo "本日 ($TODAY) は既に送信済みです。バックアップ実行をスキップします。"
-          else
-            echo "should_send=true" >> $GITHUB_OUTPUT
-            echo "本日 ($TODAY) の送信が未確認。メール送信を実行します。"
+          # 直近 8 時間以内に成功済みか確認
+          # （primary は UTC 23:50 起動, backup は UTC 04:00 起動のため日付跨ぎあり）
+          RECENT=$(gh run list \
+            --repo "$GITHUB_REPOSITORY" \
+            --workflow=daily-news.yml \
+            --status=success \
+            --limit=5 \
+            --json createdAt \
+            --jq '.[0].createdAt // ""')
+          if [ -n "$RECENT" ]; then
+            RECENT_EPOCH=$(date -d "$RECENT" +%s 2>/dev/null || echo 0)
+            NOW_EPOCH=$(date +%s)
+            DIFF=$((NOW_EPOCH - RECENT_EPOCH))
+            if [ "$DIFF" -lt 28800 ]; then
+              echo "should_send=false" >> $GITHUB_OUTPUT
+              echo "直近 8 時間以内に送信済みです (${DIFF}秒前)。バックアップ実行をスキップします。"
+              exit 0
+            fi
           fi
+          echo "should_send=true" >> $GITHUB_OUTPUT
+          echo "送信済みの記録なし。メール送信を実行します。"
         env:
           GH_TOKEN: ${{ github.token }}
 
@@ -41,7 +52,7 @@ jobs:
     needs: check
     if: needs.check.outputs.should_send == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
 
     steps:
       - name: Checkout
@@ -69,3 +80,6 @@ jobs:
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
           RECIPIENT_EMAIL: ${{ secrets.RECIPIENT_EMAIL }}
           NODE_ENV: production
+          # schedule 時のみ UTC 00:00 (JST 09:00) まで待機してから送信
+          # workflow_dispatch 時は空文字列のため即時送信
+          SEND_AT_UTC: ${{ github.event_name == 'schedule' && '00:00' || '' }}
