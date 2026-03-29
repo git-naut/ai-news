@@ -27,7 +27,7 @@ jobs:
           TODAY=$(date -u +%Y-%m-%d)
           echo "確認日付: $TODAY"
           # 本日の成功ランを確認（現在のランは in-progress のため含まれない）
-          if gh run list --workflow=daily-news.yml --status=success --limit=10 | grep -q "$TODAY"; then
+          if gh run list --repo "$GITHUB_REPOSITORY" --workflow=daily-news.yml --status=success --limit=10 | grep -q "$TODAY"; then
             echo "should_send=false" >> $GITHUB_OUTPUT
             echo "本日 ($TODAY) は既に送信済みです。バックアップ実行をスキップします。"
           else
