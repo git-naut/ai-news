@@ -2,11 +2,14 @@ name: Daily AI News Digest
 
 on:
   schedule:
-    # UTC 23:50 = JST 08:50 (前処理開始、UTC 00:00 = JST 09:00 に送信)
-    - cron: '50 23 * * *'
-    # UTC 04:00 = JST 13:00 (backup: primary がスキップされた場合のみ送信)
+    # UTC 04:00 = JST 13:00 (backup: cron-job.org による primary が失敗した場合のみ送信)
     - cron: '0 4 * * *'
   workflow_dispatch:
+    inputs:
+      immediate:
+        description: '即時送信（テスト用。通常は false にして UTC 00:00 = JST 09:00 まで待機）'
+        type: boolean
+        default: false
 
 jobs:
   check:
@@ -19,13 +22,14 @@ jobs:
       - name: 本日送信済みか確認
         id: dedup
         run: |
-          # workflow_dispatch は常に送信
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          # immediate=true の手動実行は重複チェックをスキップして即時送信
+          if [ "${{ inputs.immediate }}" = "true" ]; then
             echo "should_send=true" >> $GITHUB_OUTPUT
+            echo "即時送信モードのため重複チェックをスキップします。"
             exit 0
           fi
           # 直近 8 時間以内に成功済みか確認
-          # （primary は UTC 23:50 起動, backup は UTC 04:00 起動のため日付跨ぎあり）
+          # （cron-job.org による primary は UTC 23:45 起動, backup は UTC 04:00 起動のため日付跨ぎあり）
           RECENT=$(gh run list \
             --repo "$GITHUB_REPOSITORY" \
             --workflow=daily-news.yml \
@@ -39,7 +43,7 @@ jobs:
             DIFF=$((NOW_EPOCH - RECENT_EPOCH))
             if [ "$DIFF" -lt 28800 ]; then
               echo "should_send=false" >> $GITHUB_OUTPUT
-              echo "直近 8 時間以内に送信済みです (${DIFF}秒前)。バックアップ実行をスキップします。"
+              echo "直近 8 時間以内に送信済みです (${DIFF}秒前)。スキップします。"
               exit 0
             fi
           fi
@@ -80,6 +84,7 @@ jobs:
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
           RECIPIENT_EMAIL: ${{ secrets.RECIPIENT_EMAIL }}
           NODE_ENV: production
-          # schedule 時のみ UTC 00:00 (JST 09:00) まで待機してから送信
-          # workflow_dispatch 時は空文字列のため即時送信
-          SEND_AT_UTC: ${{ github.event_name == 'schedule' && '00:00' || '' }}
+          # immediate=true の手動実行以外は UTC 00:00 (JST 09:00) まで待機してから送信
+          # cron-job.org による dispatch (immediate=false) も待機あり
+          # schedule (backup) も待機あり
+          SEND_AT_UTC: ${{ inputs.immediate == 'true' && '' || '00:00' }}
