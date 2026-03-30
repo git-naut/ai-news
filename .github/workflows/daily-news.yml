@@ -75,6 +75,19 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: メール送信タイミング設定
+        run: |
+          # GitHub Actions 式で空文字列を返せないため、シェルで直接 GITHUB_ENV に書き込む
+          # immediate=true: SEND_AT_UTC を未設定（即時送信）
+          # それ以外: UTC 00:00 (JST 09:00) まで待機
+          if [ "${{ inputs.immediate }}" = "true" ]; then
+            echo "SEND_AT_UTC=" >> "$GITHUB_ENV"
+            echo "即時送信モード: SEND_AT_UTC を空に設定します。"
+          else
+            echo "SEND_AT_UTC=00:00" >> "$GITHUB_ENV"
+            echo "待機モード: UTC 00:00 (JST 09:00) まで待機します。"
+          fi
+
       - name: Send daily digest
         run: pnpm start
         env:
@@ -84,8 +97,4 @@ jobs:
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
           RECIPIENT_EMAIL: ${{ secrets.RECIPIENT_EMAIL }}
           NODE_ENV: production
-          # immediate=true の手動実行以外は UTC 00:00 (JST 09:00) まで待機してから送信
-          # cron-job.org による dispatch (immediate=false) も待機あり
-          # schedule (backup) も待機あり
-          # 注: `'' || '00:00'` は常に '00:00' を返すため != で条件を反転して回避
-          SEND_AT_UTC: ${{ inputs.immediate != 'true' && '00:00' || '' }}
+          # SEND_AT_UTC は前ステップで GITHUB_ENV に設定済み
