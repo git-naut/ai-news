@@ -9,7 +9,7 @@ import { analyzeTrends } from './ai/trend-analyzer.js';
 import { applyFallbackSummaries } from './ai/fallback.js';
 import { buildTemplateData, renderTemplate, formatJstDate } from './mail/template-engine.js';
 import { sendEmail } from './mail/sender.js';
-import { computeSendDelay } from './schedule/send-delay.js';
+import { computeSendDelay, plannedSendTime } from './schedule/send-delay.js';
 import type { Article } from './feeds/types.js';
 import type { Trend } from './ai/trend-analyzer.js';
 
@@ -20,8 +20,6 @@ import type { Trend } from './ai/trend-analyzer.js';
 async function main(): Promise<void> {
   const startTime = Date.now();
   console.log('[ai-news] 開始:', new Date().toISOString());
-
-  const deliveryDate = formatJstDate(new Date());
 
   // Step 1: ニュース取得（RSS + News API を並列実行）
   console.log('[ai-news] ニュース取得中...');
@@ -65,15 +63,19 @@ async function main(): Promise<void> {
     console.warn('[ai-news] 取得できた記事が0件でした。空のダイジストを送信します。');
   }
 
+  // SEND_AT_UTC が指定されている場合、その時刻まで待機してから送信する
+  // （例: "00:00" → UTC 00:00 = JST 09:00 に送信）
+  // 待ちが SEND_MAX_WAIT_MINUTES を超える場合は翌日へ繰り越さず即時に送る
+  const now = new Date();
+  const sleepMs = computeSendDelay(now, env.SEND_AT_UTC, env.SEND_MAX_WAIT_MINUTES * 60 * 1000);
+
   // Step 4: メール生成
+  // 配信時刻は起動時刻ではなく送信予定時刻（now + 待ち）で描く
+  const deliveryDate = formatJstDate(plannedSendTime(now, sleepMs));
   const templateData = buildTemplateData(summarized, trends, deliveryDate);
   const html = renderTemplate('digest', templateData);
   const text = renderTemplate('digest-text', templateData);
 
-  // SEND_AT_UTC が指定されている場合、その時刻まで待機してから送信する
-  // （例: "00:00" → UTC 00:00 = JST 09:00 に送信）
-  // 待ちが SEND_MAX_WAIT_MINUTES を超える場合は翌日へ繰り越さず即時に送る
-  const sleepMs = computeSendDelay(new Date(), env.SEND_AT_UTC, env.SEND_MAX_WAIT_MINUTES * 60 * 1000);
   if (sleepMs > 0) {
     console.log(`[ai-news] UTC ${env.SEND_AT_UTC} まで待機中 (${(sleepMs / 1000).toFixed(0)}秒)...`);
     await new Promise((resolve) => setTimeout(resolve, sleepMs));
