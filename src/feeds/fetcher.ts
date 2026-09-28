@@ -3,6 +3,7 @@ import pLimit from 'p-limit';
 import { normalizeItem } from './normalizer.js';
 import type { RawArticle } from './types.js';
 import type { FeedSource } from '../config/feeds.js';
+import { isWithinLookback } from '../config/lookback.js';
 
 /** rss-parser のカスタムフィールド型 */
 type CustomItem = {
@@ -20,9 +21,6 @@ const parser = new Parser<Record<string, unknown>, CustomItem>({
 /** 並列 HTTP 接続数の上限 */
 const REQUEST_CONCURRENCY = 5;
 
-/** 過去何時間以内の記事を対象とするか（36h: 週明け月曜に土日分を取りこぼさないため） */
-const LOOKBACK_HOURS = 36;
-
 /**
  * 1つの RSS/Atom フィードを取得して RawArticle の配列を返す。
  * ネットワークエラーやパースエラーが発生した場合は空配列を返す（パイプラインを止めない）。
@@ -30,16 +28,19 @@ const LOOKBACK_HOURS = 36;
 async function fetchFeed(source: FeedSource): Promise<RawArticle[]> {
   try {
     const feed = await parser.parseURL(source.url);
-    const cutoff = new Date(Date.now() - LOOKBACK_HOURS * 60 * 60 * 1000);
+    const now = new Date();
 
     const articles: RawArticle[] = [];
 
     for (const item of feed.items) {
       if (articles.length >= source.maxItems) break;
 
-      const article = normalizeItem(item, source);
+      // 相対リンクはフィードが示すサイトの link を基準にする。XML の置き場所（raw.githubusercontent.com など）は
+      // サイトと別のホストのことがあり、そこを基準にすると存在しない URL になる
+      const article = normalizeItem(item, source, feed.link);
       if (!article) continue;
-      if (article.publishedAt < cutoff) continue;
+      // 取得窓の外の記事は捨てる（窓の長さは config/lookback.ts で NewsData と共有）
+      if (!isWithinLookback(article.publishedAt, now)) continue;
 
       articles.push(article);
     }

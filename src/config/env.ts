@@ -3,7 +3,10 @@ import 'dotenv/config';
 import { sendAtUtcSchema, sendMaxWaitMinutesSchema } from '../schedule/send-delay.js';
 
 const envSchema = z.object({
-  GEMINI_API_KEY: z.string().min(1, 'GEMINI_API_KEY is required'),
+  /** BytePlus ModelArk の API キー（ap-southeast-1。他リージョンの鍵は 401） */
+  ARK_API_KEY: z.string().min(1, 'ARK_API_KEY is required'),
+  /** ModelArk の呼び出し口。例: https://ark.ap-southeast.bytepluses.com/api/v3 */
+  ARK_BASE_URL: z.string().url('ARK_BASE_URL must be a URL'),
   NEWS_API_KEY: z.string().min(1, 'NEWS_API_KEY is required'),
   GMAIL_USER: z.string().email('GMAIL_USER must be a valid email'),
   GMAIL_APP_PASSWORD: z.string().min(1, 'GMAIL_APP_PASSWORD is required'),

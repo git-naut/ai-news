@@ -274,3 +274,323 @@ gaps.json を置き、LOOP-2 が反応しないことを確かめる。
 待ちは 24 時間になり、上限（最大 60 分）を超えるので結果は 0 のまま。どの入力でも
 挙動が同じ等価変異なので、手作業の逆テストで escaped と出ても検査は足さなかった。
 等価かどうかは、上限が 24 時間未満であることに依存する。上限の範囲を広げるときは見直す。
+
+## テストと型
+
+<!-- L:UNIT-001 family=unit check=UNIT-1 mutation=m_unit_001 -->
+### 待機の上限は、テストが落ちることで守る
+
+`computeSendDelay` の上限を外すと、3 か月の欠配と同じ形に戻る。unit 系統は vitest を JSON で
+走らせ、落ちたテスト1件を不合格1件として返す。終了コードではなく件数を返すので、
+逆テストの増分判定がそのまま効く。1 回 35 秒前後かかるため slow 系統にした。
+
+<!-- L:UNIT-002 family=unit check=UNIT-1 mutation=m_unit_002 -->
+### 重複判定は、送信ジョブの結論まで見る
+
+cancelled や skipped の primary を送信済みに数えると、欠配の日に予備が出ない。
+判定スクリプトは偽の gh を PATH に置いたテストで分岐ごとに走らせている。
+
+<!-- L:UNIT-003 family=unit check=UNIT-1 mutation=m_unit_003 -->
+### 予備配信の印は件名のテストで守る
+
+印が消えると、primary が届かなかった日を受信箱で見分けられない。
+2026-09-29 の予備配信は、宛先の個人 Gmail に届いていた。
+
+<!-- L:UNIT-004 family=unit check=UNIT-2 mutation=m_unit_004 -->
+### tests/ の型は誰も検査していなかった
+
+ルートの tsconfig.json は `include: ["src/**/*.ts"]` で、tests/ を除外していた。
+tests/tsconfig.json を作って typecheck と unit 系統の両方にかけた。初回の型エラーは 0 件だった。
+0 件が素通りでないことは `--listFilesOnly` で確かめた（src 19 本、tests 11 本）。
+
+<!-- L:UNIT-005 family=unit mutation=m_none_009 -->
+### コメントの言い換えで unit が反応しないこと
+
+UNIT はテストの合否と型だけを見る。コメントや説明文で赤くなるなら、テストが文面に依存している。
+
+<!-- L:OPS-003 family=ops -->
+### 宛先は送信元と同じ個人の Gmail
+
+.env では GMAIL_USER と RECIPIENT_EMAIL が同じ個人の @gmail.com になっている。
+2026-09-29 に「届いていない」と見えたのは、別の受信箱（会社の Workspace）を探していたため。
+配信の確認は宛先の受信箱で `in:anywhere subject:予備配信` のように探す。
+
+## ワークフローの版と実行環境
+
+<!-- L:WF-013 family=wf check=WF-7 mutation=m_wf_009 -->
+### 浮動タグ v4 は node20 のまま残っている
+
+actions/checkout と setup-node は v5 から、pnpm/action-setup は v6 から node24 で動く。
+pnpm/action-setup の v4.4.0 のリリースノートには「Node.js 24 へ更新」とある。それでも浮動タグ `v4` の
+action.yml は node20 のままだった（2026-09-29 に gh api で確認）。リリースノートでなく
+action.yml の `runs.using` を見て下限を決め、WF-7 に表として持たせた。
+
+<!-- L:WF-014 family=wf check=WF-8 mutation=m_wf_010 -->
+### ubuntu-latest は移行の時期を選ばせてくれない
+
+2026-10-19 から 11-19 にかけて ubuntu-latest が 26.04 に切り替わる（runner-images #14748）。
+全ジョブを ubuntu-24.04 に固定し、26.04 への移行は別の作業として自分で決める。WF-8 は
+runs-on が `ubuntu-XX.YY` の形であることを見る。
+
+<!-- L:WF-015 family=wf check=WF-9 mutation=m_wf_011 -->
+### pnpm の版は packageManager に一本化する
+
+pnpm/action-setup v6 は、with.version と package.json の packageManager が文字列で一致しないと
+失敗する。`version: 10` と `pnpm@10.34.5` でも落ちる。with.version を外し、packageManager に
+CI で解決されていた 10.34.5 を書いた。手元の pnpm 10.32.1 もこの指定を読んで 10.34.5 に切り替わった。
+
+<!-- L:WF-016 family=wf mutation=m_none_010 -->
+### ステップ名の言い換えで WF-7 と WF-9 が反応しないこと
+
+見るのは uses と with だけ。表示名は人のためのもの。
+
+## LLM（BytePlus ModelArk）
+
+<!-- L:LLM-001 family=wf check=WF-10 mutation=m_wf_012 -->
+### env.ts が必須にした変数は、ワークフローが渡さないと起動直後に落ちる
+
+LLM を Gemini から ModelArk へ移すと、必須の変数が GEMINI_API_KEY から ARK_API_KEY と
+ARK_BASE_URL に変わる。env.ts だけを直してワークフローを直し忘れると、import の時点で zod が
+例外を投げ、その日は1通も送れない。vitest は env.ts を読み込まないので気づけない。
+WF-10 は env.ts の `z.` で始まり default と optional を持たない鍵を集め、送信ステップの env に
+すべてあることを見る。
+
+<!-- L:LLM-002 family=wf check=WF-3 mutation=m_wf_013 -->
+### ModelArk の鍵はリージョンで分かれている
+
+ap-southeast-1 で発行した鍵を eu-west の呼び出し口に投げると 401 になる。呼び出し口は秘密ではないので
+ワークフローに直接書き、WF-3 が ap-southeast の URL であることを見る。
+
+<!-- L:LLM-003 family=unit check=UNIT-1 mutation=m_unit_005 -->
+### 閉じた JSON でも finish_reason=length なら採らない
+
+切れた応答の多くは JSON のパースで落ちるので、長さの判定を消してもテストは緑のままだった
+（逆テストを書く前に、同じ経路で予備モデルへ回ることに気づいた）。上限でちょうど閉じた応答は
+パースを通り、件数が足りないまま採られる。JSON として正しく閉じた応答に length を付けたテストを
+足し、判定そのものに歯を立てた。
+
+<!-- L:LLM-004 family=unit check=UNIT-1 mutation=m_unit_006 -->
+### seed-2-0 系は思考を止めないと遅く高くなる
+
+既定では思考が出力トークンに載る。`thinking: {type: "disabled"}` で止め、2026-09-29 の実測では
+reasoning_tokens が 0、5 件の要約が 4.2 秒だった。
+
+<!-- L:LLM-005 family=unit check=UNIT-1 mutation=m_unit_007 -->
+### 1 バッチの失敗を全件に広げない
+
+旧実装は `Promise.all` でバッチを並べたので、1 本が落ちると全件がフォールバックの抜粋になった。
+いまは直列で回し、失敗したバッチの記事だけ summary を null のまま残す。
+
+<!-- L:LLM-006 family=dep check=DEP-3 mutation=m_dep_004 -->
+### サポートが終わった SDK を依存に戻さない
+
+@google/generative-ai は 2025-11-30 にサポートが終わった。Gemini は新旧の SDK とも外した。
+DEP-3 は入れない依存の表を持ち、package.json のどの区分にも無いことを見る。
+
+<!-- L:LLM-007 family=unit mutation=m_none_011 -->
+### ログの言い換えで unit が反応しないこと
+
+テストはモデルと出力形式の並びを見る。ログの文面では赤くならない。
+
+<!-- L:LLM-008 family=ops -->
+### Gemini から離れた理由（2026-09-29 の実測）
+
+手元のキーのプロジェクトは前払い課金の残高が 0 で、3.8 Flash と 3.5 Flash-Lite は 402 を返した。
+2.5 系は素の REST なら 200 だったが、@google/genai 2.24.0 からは 404「新規ユーザーには提供しない」を
+返した。送り先の URL は同じだった。違いを突き止める前に 429 で止まり、原因は確定していない。
+短時間に 12 回ほど叩いたのが 429 の引き金と見ている。実機で確かめるときは間隔を空け、条件を
+1 つずつ変える。ModelArk の lite-260428 と 260228 は構造化出力で 200 だった。
+
+<!-- L:OPS-004 family=ops -->
+### worktree のエージェントは本体の node_modules を共有している
+
+並列の修正エージェントは node_modules を本体から symlink している。本体で `pnpm add` や
+`pnpm remove` を打つと、別の worktree のテストと型検査から依存が消える。2026-09-29 に旧 SDK を
+2 回消してしまい、その都度 lockfile から入れ直した。エージェントが走っている間は依存を変えない。
+
+## 段3 の既知バグ（2026-09-29、並列の修正と敵対的な検証）
+
+<!-- L:UNIT-101 family=unit check=UNIT-1 mutation=m_unit_101 -->
+### 1記事の壊れたリンクがフィード全体を道連れにする
+
+相対リンクや `http://[::1` のような壊れたリンクを1件含むフィードは、記事が1件も配信されなかった。normalizeItem の `new URL(url).origin` が例外を投げ、fetchFeed がそれをフィード単位の try/catch で受けて空配列を返していたのが原因。
+記事単位の正規化関数は例外を投げない約束にした。resolveLink で `new URL(link, base)` を try/catch で包み、解決できないリンクと http(s) 以外のリンクはその記事だけ null にする。相対リンクは第3引数 baseUrl（省略時は source.url）で絶対 URL に直す。元から絶対 URL のものは記事 ID が変わらないよう表記をそのまま残す。
+fetcher.ts のループ内に try/catch を足す案は採らなかった。呼び出し側ごとに守りを書くと、次に normalizeItem を使う箇所で同じ穴が開くため。
+
+<!-- L:UNIT-102 family=unit mutation=m_none_101 -->
+### normalizeItem のコメントは UNIT が見ない軸
+
+UNIT はテストの合否と型だけを見る。相対リンクの説明コメントを言い換えても振る舞いは変わらないので、捕まらないのが正しい。
+
+<!-- L:UNIT-111 family=unit check=UNIT-1 mutation=m_unit_111 -->
+### テキストメールのテンプレートにも Handlebars の HTML エスケープがかかる
+
+AT&T's "GPT" <beta> という題の記事が、テキストメールでは AT&amp;T&#x27;s &quot;GPT&quot; &lt;beta&gt; の形で届いていた。
+digest-text.hbs も digest.hbs と同じ Handlebars.compile(source) で組まれていた。そのため {{ }} の既定のエスケープがプレーンテキストにもかかっていた。
+直し方として、template-engine.ts の PLAIN_TEXT_TEMPLATES に名前を載せたテンプレートだけを noEscape: true で組むようにした。HTML 版は既定のエスケープのままで、<script> は実体参照で残る。これはテストで固定してある。
+各変数を triple-stash {{{ }}} で書く案は採らなかった。テキスト側に項目を足すたびに書き忘れると同じ欠陥が戻り、その差分はレビューでも目に入りにくい。
+名前の末尾が -text かどうかで決める案も見送った。HTML のテンプレートに誤ってその名前を付けただけで XSS 対策が外れてしまうので、明示した名前だけを外す形にしている。
+
+<!-- L:UNIT-112 family=unit mutation=m_none_111 -->
+### PLAIN_TEXT_TEMPLATES の説明コメントは UNIT の監視対象外
+
+UNIT が見るのは vitest の合否と tsc の型だけで、JSDoc の文言が変わっても実行結果は同じになる。そのため、この変異を捕まえないのが正しい。
+
+<!-- L:UNIT-121 family=unit check=UNIT-1 mutation=m_unit_121 -->
+### URL の正規化でクエリを丸ごと捨てると別記事が1件に潰れる
+
+`news.ycombinator.com/item?id=1` と `?id=2` が同じ記事として重複除去され、片方が配信から消えていた。normalizeUrl が utm を外すつもりで search を空にし、さらに URL 全体を小文字にしていたのが原因。HN の id や YouTube の v のように、クエリ自体が記事を識別するサイトがある。パスの大小を区別するサイトもある。
+直し方として、小文字にするのはスキームとホストだけにした。クエリからは utm_* と fbclid、gclid、mc_cid、mc_eid、ref、ref_src だけを外し、残りはキー順に並べる。
+逆に「残すパラメータ」を許可リストで持つ案は採らなかった。未知のサイトが来るたびに潰れる側へ倒れ、今回と同じ欠落を黙って起こすからだ。外す側を列挙すれば、漏れても重複が1件残るだけで済む。
+
+<!-- L:UNIT-122 family=unit mutation=m_none_121 -->
+### normalizeUrl のコメントは UNIT の見ていない軸
+
+UNIT はテストの合否と型だけを見る。組み立て直前のコメントを言い換えても挙動は変わらないので、捕まえないのが正しい。
+
+<!-- L:UNIT-131 family=unit check=UNIT-1 mutation=m_unit_131 -->
+### 英字キーワードを includes() で探すと storage の中の rag を拾う
+
+classifyArticle は小文字化した本文に includes() を当てていた。そのため storage や average の rag、google の go、rapid の api、iso3 の o3 がそれぞれカテゴリを決めていた。語の途中に同じ綴りが現れることを部分一致は区別できない。
+ASCII だけのキーワードは前後が英数字でない位置でのみ一致させ、c++ や gpt-5 の記号は退避してから正規表現に埋め、末尾の複数形 s は許した。日本語を含むキーワードは語の境界が決まらないので部分一致のまま残している。
+\b を使う案は採らなかった。c++ のように記号で終わるキーワードでは \b が効かず、日本語の直後に英字が続く「RAGを使う」でも境界の扱いが揺れるため、英数字の否定先読みと後読みで書いた。
+
+<!-- L:UNIT-132 family=unit mutation=m_none_131 -->
+### 退避処理のコメントは UNIT の見る軸ではない
+
+UNIT はテストの合否と型だけを見る。matchesKeyword のコメントを言い換えても振る舞いは変わらないので、捕まえてはいけない。
+
+<!-- L:UNIT-141 family=unit check=UNIT-1 mutation=m_unit_141 -->
+### 配信時刻を起動時に決めると、待った分だけ件名の時刻がずれる
+
+UTC 23:45 に起動して 00:00 まで待つ primary の件名と本文が、09:00 JST に届いたのに「08:45 JST」と表示していた。
+src/index.ts が main の先頭で formatJstDate(new Date()) を呼んでおり、取得、要約、SEND_AT_UTC の待ちの前の時刻が残っていた。
+修正では待ちを先に computeSendDelay で求め、plannedSendTime(now, delay) が返す時刻でテンプレートと件名を描く。plannedSendTime は純関数として切り出し、23:45:10Z に 14 分 50 秒を足すと 09:00 JST になることをテストで押さえた。
+先に待ってから描画する案も考えたが、採らなかった。main の順番を入れ替えるだけでは単体テストに載らず、同じずれが戻っても誰も気づけない。
+
+<!-- L:UNIT-142 family=unit mutation=m_none_141 -->
+### plannedSendTime の説明コメントは UNIT の監視対象ではない
+
+UNIT が見ているのはテストの合否と型だけで、JSDoc の言い回しを変えても挙動は変わらない。ここで検査が落ちたら、検査がコメントに依存しているということになる。
+
+<!-- L:UNIT-151 family=unit check=UNIT-1 mutation=m_unit_151 -->
+### 取得窓を取得元ごとに直書きすると片方だけ週末分を落とす
+
+RSS は 36 時間、NewsData は 24 時間と別々に書かれていた。そのため月曜朝の配信では、NewsData から来た土日の記事だけが一件も残らなかった。
+36 時間という値は週末の取りこぼしを防ぐために決めたもので、その理由は fetcher.ts のコメントにしか残っていなかった。client.ts を書いた側はこのコメントを見ていなかった。
+src/config/lookback.ts に LOOKBACK_HOURS と isWithinLookback を置き、両方の取得元がこれを読むように変えた。テストでは 30 時間前の記事が両方で残り、40 時間前の記事が両方で落ちることを確かめる。
+取得元ごとに窓の長さを引数で渡す案も考えたが採らなかった。値を分けられる形にすると、今回と同じずれを再び書けてしまうからだ。
+
+<!-- L:UNIT-152 family=unit mutation=m_none_151 -->
+### LOOKBACK_HOURS の説明コメントは UNIT の監視対象外
+
+UNIT はテストの合否と型だけを見る。36 時間を選んだ理由を書いたコメントを言い換えても、どの結果も変わらない。
+
+<!-- L:UNIT-161 family=unit check=UNIT-1 mutation=m_unit_161 -->
+### 語の境界を厳密にすると、長い語の派生形を取りこぼす
+
+storage の中の rag を拾わないよう、英字キーワードを語の境界で照合した。すると agentic・gpt4o・llama3・
+llamaindex が agent・gpt・llama に当たらなくなった（検証役が見つけた）。4 文字以下の語は後ろに英字が
+続けば一致させず、数字は許す。数字で終わる語（gpt-5、o3）は後ろの数字も許さない。英字で終わる
+5 文字以上の語は前方一致にした。
+
+<!-- L:UNIT-162 family=unit check=UNIT-1 mutation=m_unit_162 -->
+### 相対リンクの基準は XML の置き場所ではなくサイトの link
+
+normalizeItem に基準の引数を足しても、呼び出し側の fetcher が渡していなかった。Anthropic の
+フィードは raw.githubusercontent.com にあり、そこを基準にすると存在しない URL になる。fetcher の
+テストに、XML とサイトが別ホストのフィードを足してから直した。
+
+<!-- L:UNIT-163 family=unit check=UNIT-1 mutation=m_unit_163 -->
+### テキスト版のエスケープを外す修正は、HTML 側の歯も要る
+
+HTML のエスケープを守るテストは修正前から緑なので、テキスト版の変異だけでは HTML 側の退行を
+捕まえられるか分からない。平文のテンプレートの集合に digest を足す変異を置いた。
+
+<!-- L:UNIT-164 family=unit check=UNIT-1 mutation=m_unit_164 -->
+### 取得窓は境界の値で固定する
+
+30 時間と 40 時間の記事だけで確かめていたので、31〜39 のどれにしてもテストが通った。36 時間
+ちょうどを内側、1 ミリ秒古いものを外側とするテストで固定した。
+
+<!-- L:UNIT-165 family=unit mutation=m_none_161 -->
+### fetcher のコメントの言い換えで unit が反応しないこと
+
+UNIT はテストの合否と型だけを見る。
+
+## Hacker News（hnrss から Algolia へ）
+
+<!-- L:HN-001 family=unit check=UNIT-1 mutation=m_unit_171 -->
+### HN の検索はタイトルに限り、表記ゆれを許さない
+
+Algolia の query は既定でタイトル・URL・本文・投稿者名に当たり、タイポも許す。2026-09-29 の実測では
+LLM が「Have an LLC」に、Grok が無関係な記事に当たった。`restrictSearchableAttributes=title` と
+`typoTolerance=false` を付けると、LLM の結果は正しい1件だけになった。
+
+<!-- L:HN-002 family=unit check=UNIT-1 mutation=m_unit_172 -->
+### Ask HN には url のキーが無い
+
+値が無いときは null ではなくキーごと省かれる。url の無い投稿は `news.ycombinator.com/item?id=` の
+ページを URL にし、story_text の HTML を剥がして本文にする。
+
+<!-- L:HN-003 family=unit check=UNIT-1 mutation=m_unit_173 -->
+### 1 本の検索の失敗を HN 全体に広げない
+
+hnrss.org では 5 本中 4 本が 502 やタイムアウトになる日があった（同じ日に 200 を返したこともある）。
+Algolia でも検索 1 本ごとに失敗を閉じ込め、他の検索の記事は残す。
+
+<!-- L:HN-004 family=unit check=UNIT-1 mutation=m_unit_174 -->
+### HN の取得窓も LOOKBACK_HOURS を読む
+
+取得元ごとに窓を直書きすると、RSS と NewsData で起きた食い違いが HN でも起きる。
+URL のテストで `created_at_i>` の値まで固定した。
+
+<!-- L:HN-005 family=unit mutation=m_none_171 -->
+### HN の失敗ログの言い換えで unit が反応しないこと
+
+UNIT はテストの合否と型だけを見る。
+
+<!-- L:HN-006 family=unit -->
+### GET に body を付けると fetch が例外を投げる
+
+HN のクライアントで、呼び出し口の型に合わせて GET に空文字の body を渡しかけた。本物の fetch は
+GET や HEAD に body があると TypeError を投げるが、偽の fetch を使うテストは通ってしまう。型の body を
+省略可能にし、GET では渡さない。型を変えたら、tests/ の型検査が偽の fetch のずれを捕まえた。
+
+## 文書
+
+<!-- L:DOC-001 family=doc check=DOC-1 mutation=m_doc_001 -->
+### README の本数は取得元を足し引きしても追いつかない
+
+3 月の README は「TechCrunch など 10 ソース」と書いたまま、実物は 13 本になっていた。そこに TechCrunch は無い。
+DOC-1 は README の「RSS N 本」と「Hacker News の検索 N 本」を、feeds.ts と hn/client.ts の配列の件数と比べる。
+
+<!-- L:DOC-002 family=doc check=DOC-1 mutation=m_doc_004 -->
+### HN の本数も README と突き合わせる
+
+hnrss から Algolia へ移したように、HN の検索は RSS と別の場所で増減する。
+
+<!-- L:DOC-003 family=doc check=DOC-2 mutation=m_doc_002 -->
+### モデルを替えたら README も替える
+
+3 月の README は Gemini の無料枠を前提に書かれ、LLM を移した後も残っていた。DOC-2 は client.ts の
+主と予備のモデル ID が README にあることを見る。
+
+<!-- L:DOC-004 family=doc check=DOC-3 mutation=m_doc_003 -->
+### README の Secrets の一覧はワークフローと集合で一致させる
+
+一覧から漏れた Secret は登録し損ね、起動直後に zod が落ちる。逆に、使っていない Secret が残ると
+消してよいかが分からない。DOC-3 は送信ジョブが読む `secrets.*` の集合と、README の一覧の集合を比べる。
+
+<!-- L:DOC-005 family=doc mutation=m_none_012 -->
+### Secrets の一覧の並び替えで DOC-3 が反応しないこと
+
+DOC-3 は集合で比べる。並び順は見ていない軸。
+
+<!-- L:CHK-016 family=unit check=UNIT-1 -->
+### 変異の表の健全性テストは、変異が増えるほど遅くなる
+
+beforeAll で変異のモジュールを全部読み込む。72 本のとき、単独では 3.6〜4.0 秒だった。unit 系統が
+vitest と tsc 3 本を同時に走らせる中では、既定の 10 秒を超えて「テストファイルが読み込めません」になった。
+テストの中身ではなく時間制限の問題なので、上限を 60 秒にした。単独で流して通るのに検査の中だけで
+落ちるときは、まず負荷と時間制限を疑う。

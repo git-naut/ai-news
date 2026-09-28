@@ -29,7 +29,14 @@ export function formatJstDate(date: Date): string {
 const templateCache = new Map<string, HandlebarsTemplateDelegate>();
 
 /**
+ * HTML エスケープを切るプレーンテキスト用テンプレートの名前。
+ * ここに無い名前は既定どおりエスケープする（HTML 側の XSS 対策を外さないため、明示した分だけ外す）。
+ */
+const PLAIN_TEXT_TEMPLATES: ReadonlySet<string> = new Set(['digest-text']);
+
+/**
  * Handlebars テンプレートをコンパイルして返す（キャッシュあり）。
+ * プレーンテキスト用テンプレートは noEscape で組み、`&` や `<` を実体参照にせずそのまま出す。
  */
 function getTemplate(templateName: string): HandlebarsTemplateDelegate {
   const cached = templateCache.get(templateName);
@@ -37,7 +44,7 @@ function getTemplate(templateName: string): HandlebarsTemplateDelegate {
 
   const templatePath = join(__dirname, '../templates', `${templateName}.hbs`);
   const source = readFileSync(templatePath, 'utf-8');
-  const compiled = Handlebars.compile(source);
+  const compiled = Handlebars.compile(source, { noEscape: PLAIN_TEXT_TEMPLATES.has(templateName) });
   templateCache.set(templateName, compiled);
   return compiled;
 }

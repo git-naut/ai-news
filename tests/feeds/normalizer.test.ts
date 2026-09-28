@@ -80,4 +80,40 @@ describe('normalizeItem', () => {
     const result = normalizeItem(item, mockSource);
     expect(result?.content).toBe('Full content here');
   });
+
+  it('壊れたリンクの記事は null を返し、例外を投げない', () => {
+    const item = { title: 'Broken', link: 'http://[::1' };
+    expect(() => normalizeItem(item, mockSource)).not.toThrow();
+    expect(normalizeItem(item, mockSource)).toBeNull();
+  });
+
+  it('http(s) 以外のリンクは null を返す', () => {
+    const item = { title: 'Script', link: 'javascript:alert(1)' };
+    expect(normalizeItem(item, mockSource)).toBeNull();
+  });
+
+  it('相対リンクは baseUrl（フィードの link）を基準に絶対 URL へ解決する', () => {
+    const item = { title: 'Relative', link: '/posts/1' };
+    const result = normalizeItem(item, mockSource, 'https://blog.example.org/');
+    expect(result?.url).toBe('https://blog.example.org/posts/1');
+    expect(result?.sourceUrl).toBe('https://blog.example.org');
+  });
+
+  it('baseUrl が無いときの相対リンクはフィードの URL を基準に解決する', () => {
+    const item = { title: 'Relative', link: 'posts/2' };
+    const result = normalizeItem(item, mockSource);
+    expect(result?.url).toBe('https://test.example.com/posts/2');
+    expect(result?.sourceUrl).toBe('https://test.example.com');
+  });
+
+  it('壊れたリンクの記事が1件混ざっても、同じフィードの正常な記事は残る', () => {
+    const items = [
+      { title: 'Broken', link: 'http://[::1', isoDate: '2026-03-23T01:00:00.000Z' },
+      { title: 'Good', link: 'https://example.com/good', isoDate: '2026-03-23T02:00:00.000Z' },
+    ];
+    const articles = items
+      .map((item) => normalizeItem(item, mockSource))
+      .filter((a) => a !== null);
+    expect(articles.map((a) => a.title)).toEqual(['Good']);
+  });
 });

@@ -19,7 +19,7 @@ export interface ArticlePair {
 /** テンプレートに渡すカテゴリセクションのデータ */
 export interface CategorySection {
   name: string;
-  /** Material Icons のアイコン名 */
+  /** 見出しの記号（Gmail が Web フォントを読まないので Unicode 記号を使う。例 ◇） */
   icon: string;
   articles: ArticleTemplateData[];     // テキストテンプレート用
   articlePairs: ArticlePair[];         // 2カラムHTMLテンプレート用

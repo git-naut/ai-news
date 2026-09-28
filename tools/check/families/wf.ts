@@ -17,8 +17,19 @@ export const speed = 'fast' as const;
 
 const DAILY = '.github/workflows/daily-news.yml';
 const DECIDE = '.github/scripts/decide-delivery.sh';
+const ENV_TS = 'src/config/env.ts';
 /** 待機の上限に足す、取得・要約・送信の時間の余裕（分）。9/29 の実測は 97.8 秒 */
 const PROCESSING_MARGIN_MIN = 10;
+
+/**
+ * node24 で動く最小のメジャー版。2026-09-29 に各 action の action.yml の runs.using を
+ * gh api で確かめた値。pnpm/action-setup は浮動タグ v4 が node20 のままだった。
+ */
+const MIN_MAJOR: Record<string, number> = {
+  'actions/checkout': 5,
+  'actions/setup-node': 5,
+  'pnpm/action-setup': 6,
+};
 
 /** ワークフローの1ステップ。 */
 interface Step {
@@ -53,7 +64,7 @@ async function load(ctx: Context, rel: string): Promise<Record<string, unknown>>
 /**
  * ワークフローの配線を調べる。
  * @param ctx 作業ツリーを読むための文脈
- * @returns WF-1〜WF-6 の結果
+ * @returns WF-1〜WF-10 の結果
  */
 export async function run(ctx: Context): Promise<Result[]> {
   const files = await ctx.files();
@@ -120,6 +131,9 @@ export async function run(ctx: Context): Promise<Result[]> {
     SEND_AT_UTC: /^\$\{\{\s*needs\.check\.outputs\.send_at_utc\s*\}\}$/,
     DELIVERY_KIND: /^\$\{\{\s*needs\.check\.outputs\.kind\s*\}\}$/,
     SEND_MAX_WAIT_MINUTES: /^\d+$/,
+    // 鍵はリージョンで分かれ、ap-southeast-1 の鍵を eu-west に投げると 401 になる
+    ARK_BASE_URL: /^https:\/\/ark\.ap-southeast\.bytepluses\.com\/api\/v3$/,
+    ARK_API_KEY: /^\$\{\{\s*secrets\.ARK_API_KEY\s*\}\}$/,
   };
   for (const [key, re] of Object.entries(want)) {
     const v = env[key];
@@ -211,7 +225,83 @@ export async function run(ctx: Context): Promise<Result[]> {
     }
   }
 
+  // WF-7〜9: 全ワークフローの actions の版、runs-on、pnpm の版の指定
+  const pkg: unknown = JSON.parse(await ctx.read('package.json'));
+  const packageManager = isRecord(pkg) && typeof pkg['packageManager'] === 'string' ? pkg['packageManager'] : '';
+  const versionFails: Failure[] = [];
+  const runnerFails: Failure[] = [];
+  const pnpmFails: Failure[] = [];
+  let usesCount = 0;
+  let jobCount = 0;
+  for (const rel of workflows) {
+    const doc = await load(ctx, rel);
+    const wfJobs = isRecord(doc['jobs']) ? doc['jobs'] : {};
+    for (const [jobId, job] of Object.entries(wfJobs)) {
+      if (!isRecord(job)) continue;
+      jobCount++;
+      const runsOn = job['runs-on'];
+      if (typeof runsOn !== 'string' || !/^ubuntu-\d{2}\.\d{2}$/.test(runsOn)) {
+        runnerFails.push({
+          check: 'WF-8',
+          message: `runs-on が版を固定していません: ${String(runsOn)}`,
+          where: `${rel} jobs.${jobId}`,
+          remedy: 'ubuntu-latest は 2026-10-19 から Ubuntu 26 へ移る。移行は自分で決めるため ubuntu-24.04 のように固定します。',
+        });
+      }
+      for (const step of stepsOf(job['steps'])) {
+        if (typeof step.uses !== 'string') continue;
+        usesCount++;
+        const m = /^([^@]+)@v(\d+)/.exec(step.uses);
+        const min = m ? MIN_MAJOR[m[1] ?? ''] : undefined;
+        if (m && min !== undefined && Number(m[2]) < min) {
+          versionFails.push({
+            check: 'WF-7',
+            message: `${step.uses} は Node 20 で動く版です（v${min} 以上が node24）`,
+            where: `${rel} jobs.${jobId}`,
+            remedy: `${m[1] ?? ''}@v${min} 以上に上げてください。`,
+          });
+        }
+        if (m?.[1] === 'pnpm/action-setup') {
+          const withInputs = (step as Step & { with?: unknown }).with;
+          if (packageManager && isRecord(withInputs) && 'version' in withInputs) {
+            pnpmFails.push({
+              check: 'WF-9',
+              message: `pnpm/action-setup の with.version と package.json の packageManager（${packageManager}）が二重に指定されています`,
+              where: `${rel} jobs.${jobId}`,
+              remedy: 'v6 は2つが文字列で一致しないと失敗します。with.version を外し、packageManager に一本化してください。',
+            });
+          }
+          if (!packageManager && !(isRecord(withInputs) && 'version' in withInputs)) {
+            pnpmFails.push({ check: 'WF-9', message: 'pnpm の版がどこにも指定されていません', where: `${rel} jobs.${jobId}` });
+          }
+        }
+      }
+    }
+  }
+
+  // WF-10: env.ts が必須にした変数を、送信ステップがすべて渡している
+  // 渡し忘れると起動直後に zod が落ち、その日は1通も送れない
+  const envFails: Failure[] = [];
+  const envText = await ctx.read(ENV_TS);
+  const required = [...envText.matchAll(/^\s+([A-Z][A-Z0-9_]*):\s*(z\.[^\n]*)$/gm)]
+    .filter((m) => !/\.(default|optional)\(/.test(m[2] ?? ''))
+    .map((m) => m[1] ?? '');
+  for (const name of required) {
+    if (!(name in env)) {
+      envFails.push({
+        check: 'WF-10',
+        message: `${ENV_TS} が必須にしている ${name} を、pnpm start の env が渡していません`,
+        where: `${DAILY} jobs.send-digest`,
+        remedy: `env に ${name} を足してください（秘密なら secrets.${name} から）。`,
+      });
+    }
+  }
+
   return [
+    makeResult({ check: 'WF-10', failures: envFails, surveyed: { 必須の変数: required.length }, primary: '必須の変数' }),
+    makeResult({ check: 'WF-7', failures: versionFails, surveyed: { uses: usesCount }, primary: 'uses' }),
+    makeResult({ check: 'WF-8', failures: runnerFails, surveyed: { ジョブ: jobCount }, primary: 'ジョブ' }),
+    makeResult({ check: 'WF-9', failures: pnpmFails, surveyed: { ジョブ: jobCount }, primary: 'ジョブ' }),
     makeResult({ check: 'WF-1', failures: installFails, surveyed: { install: installs, ワークフロー: workflows.length }, primary: 'install' }),
     makeResult({ check: 'WF-2', failures: nameFails, surveyed: { 送信ジョブ: Object.keys(send).length > 0 ? 1 : 0 }, primary: '送信ジョブ' }),
     makeResult({ check: 'WF-3', failures: passFails, surveyed: { 受け渡し: Object.keys(want).length, 送信ステップ: start ? 1 : 0 }, primary: '送信ステップ' }),

@@ -25,7 +25,7 @@ export const CATEGORY_KEYWORDS: Record<Category, string[]> = {
     // Microsoft: Phi-4 / Phi-4-reasoning / Phi-4-multimodal
     'phi-4', 'microsoft phi',
     // 日本語
-    '生成ai', '大規模言語モデル', 'チャットgpt', '人工知能', 'llm',
+    '生成ai', '大規模言語モデル', 'チャットgpt', '人工知能',
   ],
   'Development': [
     'typescript', 'javascript', 'python', 'rust', 'go', 'kubernetes',

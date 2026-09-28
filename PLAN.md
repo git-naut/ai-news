@@ -1,5 +1,8 @@
 # AI ニュース自動配信システム (ai-news) 実装計画書
 
+> 2026-03 時点の初期計画で、履歴として残している。いまの構成は README.md、踏んだ罠は docs/LESSONS.md が正本。
+> ここに書いた Node 20・Gemini・hnrss・cron `0 0 * * *` は、どれも現在は使っていない。
+
 ## 概要
 
 毎朝 JST 09:00 に GitHub Actions から起動し、AI/テック系ニュースを収集→Gemini API で分析→Gmail でダイジストメールを送信するシステムを構築する。
