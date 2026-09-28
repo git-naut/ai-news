@@ -38,18 +38,45 @@ interface ParsedItem {
 }
 
 /**
+ * 記事のリンクを絶対 URL に解決する。
+ * 絶対 URL はそのまま返し、相対リンクは base を基準に解決する。
+ * 解決できないリンクと http(s) 以外のリンクは null を返す（例外は投げない）。
+ */
+function resolveLink(link: string, base: string): URL | null {
+  let parsed: URL;
+  try {
+    parsed = new URL(link, base);
+  } catch {
+    return null;
+  }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return null;
+  return parsed;
+}
+
+/**
  * rss-parser の出力を RawArticle の形式に正規化する。
- * 必須フィールドが欠損している場合は null を返す。
+ * 必須フィールドが欠損している場合や、リンクを URL として解決できない場合は null を返す。
+ * 1記事の不正で例外を投げると fetchFeed がフィードごと捨てるため、ここでは投げない。
+ * @param item rss-parser が返した1記事
+ * @param source 取得元のフィード設定
+ * @param baseUrl 相対リンクの基準（フィードの link）。省略時は source.url を使う
  */
 export function normalizeItem(
   item: ParsedItem,
-  source: FeedSource
+  source: FeedSource,
+  baseUrl?: string
 ): RawArticle | null {
   const title = item.title?.trim();
-  const url = item.link?.trim();
+  const link = item.link?.trim();
 
   // タイトルと URL は必須
-  if (!title || !url) return null;
+  if (!title || !link) return null;
+
+  // 相対リンクは絶対 URL に直し、壊れたリンクはこの記事だけ捨てる
+  const resolved = resolveLink(link, baseUrl ?? source.url);
+  if (!resolved) return null;
+  // 元から絶対 URL なら表記を変えない（記事 ID が URL 文字列から作られるため）
+  const url = URL.canParse(link) ? link : resolved.href;
 
   // 公開日時の取得（isoDate → pubDate の優先順）
   const dateStr = item.isoDate ?? item.pubDate;
@@ -71,7 +98,7 @@ export function normalizeItem(
     url,
     publishedAt,
     sourceName: source.name,
-    sourceUrl: new URL(url).origin,
+    sourceUrl: resolved.origin,
     content,
     language: source.language,
   };
