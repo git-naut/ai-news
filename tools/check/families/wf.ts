@@ -17,6 +17,7 @@ export const speed = 'fast' as const;
 
 const DAILY = '.github/workflows/daily-news.yml';
 const DECIDE = '.github/scripts/decide-delivery.sh';
+const ENV_TS = 'src/config/env.ts';
 /** 待機の上限に足す、取得・要約・送信の時間の余裕（分）。9/29 の実測は 97.8 秒 */
 const PROCESSING_MARGIN_MIN = 10;
 
@@ -63,7 +64,7 @@ async function load(ctx: Context, rel: string): Promise<Record<string, unknown>>
 /**
  * ワークフローの配線を調べる。
  * @param ctx 作業ツリーを読むための文脈
- * @returns WF-1〜WF-9 の結果
+ * @returns WF-1〜WF-10 の結果
  */
 export async function run(ctx: Context): Promise<Result[]> {
   const files = await ctx.files();
@@ -130,6 +131,9 @@ export async function run(ctx: Context): Promise<Result[]> {
     SEND_AT_UTC: /^\$\{\{\s*needs\.check\.outputs\.send_at_utc\s*\}\}$/,
     DELIVERY_KIND: /^\$\{\{\s*needs\.check\.outputs\.kind\s*\}\}$/,
     SEND_MAX_WAIT_MINUTES: /^\d+$/,
+    // 鍵はリージョンで分かれ、ap-southeast-1 の鍵を eu-west に投げると 401 になる
+    ARK_BASE_URL: /^https:\/\/ark\.ap-southeast\.bytepluses\.com\/api\/v3$/,
+    ARK_API_KEY: /^\$\{\{\s*secrets\.ARK_API_KEY\s*\}\}$/,
   };
   for (const [key, re] of Object.entries(want)) {
     const v = env[key];
@@ -275,7 +279,26 @@ export async function run(ctx: Context): Promise<Result[]> {
     }
   }
 
+  // WF-10: env.ts が必須にした変数を、送信ステップがすべて渡している
+  // 渡し忘れると起動直後に zod が落ち、その日は1通も送れない
+  const envFails: Failure[] = [];
+  const envText = await ctx.read(ENV_TS);
+  const required = [...envText.matchAll(/^\s+([A-Z][A-Z0-9_]*):\s*(z\.[^\n]*)$/gm)]
+    .filter((m) => !/\.(default|optional)\(/.test(m[2] ?? ''))
+    .map((m) => m[1] ?? '');
+  for (const name of required) {
+    if (!(name in env)) {
+      envFails.push({
+        check: 'WF-10',
+        message: `${ENV_TS} が必須にしている ${name} を、pnpm start の env が渡していません`,
+        where: `${DAILY} jobs.send-digest`,
+        remedy: `env に ${name} を足してください（秘密なら secrets.${name} から）。`,
+      });
+    }
+  }
+
   return [
+    makeResult({ check: 'WF-10', failures: envFails, surveyed: { 必須の変数: required.length }, primary: '必須の変数' }),
     makeResult({ check: 'WF-7', failures: versionFails, surveyed: { uses: usesCount }, primary: 'uses' }),
     makeResult({ check: 'WF-8', failures: runnerFails, surveyed: { ジョブ: jobCount }, primary: 'ジョブ' }),
     makeResult({ check: 'WF-9', failures: pnpmFails, surveyed: { ジョブ: jobCount }, primary: 'ジョブ' }),

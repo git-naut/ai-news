@@ -13,7 +13,6 @@
     "check": "tsx tools/check/main.ts"
   },
   "dependencies": {
-    "@google/generative-ai": "^0.24.1",
     "axios": "1.13.6",
     "date-fns": "^4.1.0",
     "date-fns-tz": "^3.2.0",

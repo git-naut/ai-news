@@ -40,23 +40,24 @@ async function main(): Promise<void> {
   const sourceCategoryMap = buildSourceCategoryMap(RSS_FEEDS);
   const classified = classifyArticles(deduped, sourceCategoryMap);
 
-  // Step 3: Gemini API による要約・トレンド分析
+  // Step 3: LLM（BytePlus ModelArk）による要約・トレンド分析
   // 失敗してもフォールバックでパイプラインを継続する
   let summarized: Article[];
   let trends: Trend[] = [];
+  const llm = { apiKey: env.ARK_API_KEY, baseUrl: env.ARK_BASE_URL };
 
   // Article 型に変換（summary: null で初期化）
   const articlesWithNull: Article[] = classified.map((a) => ({ ...a, summary: null }));
 
   try {
-    console.log('[ai-news] Gemini API で要約中...');
-    summarized = await batchSummarize(env.GEMINI_API_KEY, articlesWithNull);
+    console.log('[ai-news] LLM で要約中...');
+    summarized = await batchSummarize(llm, articlesWithNull);
 
     console.log('[ai-news] トレンド分析中...');
-    trends = await analyzeTrends(env.GEMINI_API_KEY, summarized);
+    trends = await analyzeTrends(llm, summarized);
     console.log(`[ai-news] トレンド: ${trends.length}件`);
   } catch (error) {
-    console.error('[ai-news] Gemini API エラー。フォールバック要約を使用します:', (error as Error).message);
+    console.error('[ai-news] LLM エラー。フォールバック要約を使用します:', (error as Error).message);
     summarized = applyFallbackSummaries(classified);
   }
 

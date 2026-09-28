@@ -25,6 +25,15 @@ const PINNED = ['axios'];
 const SECTIONS = ['dependencies', 'devDependencies', 'optionalDependencies'] as const;
 
 /**
+ * 依存に入れてはいけないパッケージと理由。
+ * @google/generative-ai は 2025-11-30 にサポートが終わった旧 Gemini SDK。2026-09-29 に LLM を
+ * ModelArk へ移し、Gemini の SDK は新旧とも外した。
+ */
+const FORBIDDEN: Record<string, string> = {
+  '@google/generative-ai': '2025-11-30 にサポートが終わった旧 Gemini SDK です',
+};
+
+/**
  * 依存の名前から specifier への対応を取り出す。
  * @param v package.json か lockfile の1区分
  * @param fromLock lockfile の形（名前 → { specifier, version }）なら true
@@ -46,7 +55,7 @@ function specifiers(v: unknown, fromLock: boolean): Map<string, string> {
 /**
  * 依存の宣言と lockfile の整合を調べる。
  * @param ctx 作業ツリーを読むための文脈
- * @returns DEP-1 と DEP-2 の結果
+ * @returns DEP-1〜DEP-3 の結果
  */
 export async function run(ctx: Context): Promise<Result[]> {
   const pkg: unknown = JSON.parse(await ctx.read('package.json'));
@@ -103,7 +112,19 @@ export async function run(ctx: Context): Promise<Result[]> {
     }
   }
 
+  // DEP-3: 入れてはいけない依存がどの区分にも無い
+  const forbidFails: Failure[] = [];
+  for (const section of SECTIONS) {
+    for (const name of specifiers(pkg[section], false).keys()) {
+      const why = FORBIDDEN[name];
+      if (why !== undefined) {
+        forbidFails.push({ check: 'DEP-3', message: `${section}.${name} は入れない依存です（${why}）`, where: 'package.json' });
+      }
+    }
+  }
+
   return [
+    makeResult({ check: 'DEP-3', failures: forbidFails, surveyed: { 禁止: Object.keys(FORBIDDEN).length, 依存: compared }, primary: '禁止' }),
     makeResult({ check: 'DEP-1', failures: syncFails, surveyed: { 依存: compared }, primary: '依存' }),
     makeResult({ check: 'DEP-2', failures: pinFails, surveyed: { 固定: PINNED.length }, primary: '固定' }),
   ];

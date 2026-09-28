@@ -66,7 +66,9 @@ jobs:
       - name: Send daily digest
         run: pnpm start
         env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          ARK_API_KEY: ${{ secrets.ARK_API_KEY }}
+          # ModelArk の呼び出し口（秘密ではない）。鍵はリージョンごとに分かれ、他リージョンの鍵は 401
+          ARK_BASE_URL: https://ark.ap-southeast.bytepluses.com/api/v3
           NEWS_API_KEY: ${{ secrets.NEWS_API_KEY }}
           GMAIL_USER: ${{ secrets.GMAIL_USER }}
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}

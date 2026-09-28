@@ -343,3 +343,67 @@ CI で解決されていた 10.34.5 を書いた。手元の pnpm 10.32.1 もこ
 ### ステップ名の言い換えで WF-7 と WF-9 が反応しないこと
 
 見るのは uses と with だけ。表示名は人のためのもの。
+
+## LLM（BytePlus ModelArk）
+
+<!-- L:LLM-001 family=wf check=WF-10 mutation=m_wf_012 -->
+### env.ts が必須にした変数は、ワークフローが渡さないと起動直後に落ちる
+
+LLM を Gemini から ModelArk へ移すと、必須の変数が GEMINI_API_KEY から ARK_API_KEY と
+ARK_BASE_URL に変わる。env.ts だけを直してワークフローを直し忘れると、import の時点で zod が
+例外を投げ、その日は1通も送れない。vitest は env.ts を読み込まないので気づけない。
+WF-10 は env.ts の `z.` で始まり default と optional を持たない鍵を集め、送信ステップの env に
+すべてあることを見る。
+
+<!-- L:LLM-002 family=wf check=WF-3 mutation=m_wf_013 -->
+### ModelArk の鍵はリージョンで分かれている
+
+ap-southeast-1 で発行した鍵を eu-west の呼び出し口に投げると 401 になる。呼び出し口は秘密ではないので
+ワークフローに直接書き、WF-3 が ap-southeast の URL であることを見る。
+
+<!-- L:LLM-003 family=unit check=UNIT-1 mutation=m_unit_005 -->
+### 閉じた JSON でも finish_reason=length なら採らない
+
+切れた応答の多くは JSON のパースで落ちるので、長さの判定を消してもテストは緑のままだった
+（逆テストを書く前に、同じ経路で予備モデルへ回ることに気づいた）。上限でちょうど閉じた応答は
+パースを通り、件数が足りないまま採られる。JSON として正しく閉じた応答に length を付けたテストを
+足し、判定そのものに歯を立てた。
+
+<!-- L:LLM-004 family=unit check=UNIT-1 mutation=m_unit_006 -->
+### seed-2-0 系は思考を止めないと遅く高くなる
+
+既定では思考が出力トークンに載る。`thinking: {type: "disabled"}` で止め、2026-09-29 の実測では
+reasoning_tokens が 0、5 件の要約が 4.2 秒だった。
+
+<!-- L:LLM-005 family=unit check=UNIT-1 mutation=m_unit_007 -->
+### 1 バッチの失敗を全件に広げない
+
+旧実装は `Promise.all` でバッチを並べたので、1 本が落ちると全件がフォールバックの抜粋になった。
+いまは直列で回し、失敗したバッチの記事だけ summary を null のまま残す。
+
+<!-- L:LLM-006 family=dep check=DEP-3 mutation=m_dep_004 -->
+### サポートが終わった SDK を依存に戻さない
+
+@google/generative-ai は 2025-11-30 にサポートが終わった。Gemini は新旧の SDK とも外した。
+DEP-3 は入れない依存の表を持ち、package.json のどの区分にも無いことを見る。
+
+<!-- L:LLM-007 family=unit mutation=m_none_011 -->
+### ログの言い換えで unit が反応しないこと
+
+テストはモデルと出力形式の並びを見る。ログの文面では赤くならない。
+
+<!-- L:LLM-008 family=ops -->
+### Gemini から離れた理由（2026-09-29 の実測）
+
+手元のキーのプロジェクトは前払い課金の残高が 0 で、3.8 Flash と 3.5 Flash-Lite は 402 を返した。
+2.5 系は素の REST なら 200 だったが、@google/genai 2.24.0 からは 404「新規ユーザーには提供しない」を
+返した。送り先の URL は同じだった。違いを突き止める前に 429 で止まり、原因は確定していない。
+短時間に 12 回ほど叩いたのが 429 の引き金と見ている。実機で確かめるときは間隔を空け、条件を
+1 つずつ変える。ModelArk の lite-260428 と 260228 は構造化出力で 200 だった。
+
+<!-- L:OPS-004 family=ops -->
+### worktree のエージェントは本体の node_modules を共有している
+
+並列の修正エージェントは node_modules を本体から symlink している。本体で `pnpm add` や
+`pnpm remove` を打つと、別の worktree のテストと型検査から依存が消える。2026-09-29 に旧 SDK を
+2 回消してしまい、その都度 lockfile から入れ直した。エージェントが走っている間は依存を変えない。

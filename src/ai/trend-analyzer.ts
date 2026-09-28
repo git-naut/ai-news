@@ -1,4 +1,5 @@
-import { generateText } from './client.js';
+import { z } from 'zod';
+import { generateJson, type LlmConfig } from './client.js';
 import type { Article } from '../feeds/types.js';
 
 /** トレンド分析結果の1項目 */
@@ -11,12 +12,43 @@ export interface Trend {
   action?: string;
 }
 
+/** トレンドの応答スキーマ（検証用） */
+const trendSchema = z.object({
+  trends: z.array(
+    z.object({
+      trend: z.string().min(1),
+      description: z.string().min(1),
+      action: z.string().optional(),
+    })
+  ),
+});
+
+/** トレンドの応答スキーマ（構造化出力として API に渡す） */
+const trendJsonSchema = {
+  type: 'object',
+  properties: {
+    trends: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          trend: { type: 'string', description: 'トレンドのタイトル（20文字以内）' },
+          description: { type: 'string', description: '1〜2文の技術的説明' },
+          action: { type: 'string', description: '試すための具体的アクション（リポジトリ名・ツール名・API名など）' },
+        },
+        required: ['trend', 'description'],
+      },
+    },
+  },
+  required: ['trends'],
+};
+
 /**
  * 全記事のタイトルと要約から今日のトレンドを3〜5点で分析する。
- * パースに失敗した場合は空配列を返す。
+ * 失敗した場合は空配列を返し、パイプラインを止めない。
  */
 export async function analyzeTrends(
-  apiKey: string,
+  llm: LlmConfig,
   articles: Article[]
 ): Promise<Trend[]> {
   if (articles.length === 0) return [];
@@ -29,27 +61,16 @@ export async function analyzeTrends(
   const prompt = `以下は本日の AI/テック ニュース ${Math.min(articles.length, 50)} 件のタイトルと要約です。
 これらを分析し、エンジニアが「今週押さえておくべき技術トレンド」を3〜5個、日本語で説明してください。
 観察の羅列ではなく、何を試せるか・何に備えるべきかを重視してください。
-
-必ず以下の JSON 配列形式のみで返すこと（コードブロックや説明文は不要）:
-[{
-  "trend": "トレンドのタイトル（20文字以内）",
-  "description": "1〜2文の技術的説明",
-  "action": "試すための具体的アクション（リポジトリ名・ツール名・API名など。情報がなければ省略可）"
-}]
+action は情報がなければ省略してください。
 
 ニュース一覧:
 ${articleSummaries}`;
 
   try {
-    const responseText = await generateText(apiKey, prompt);
-
-    const jsonMatch = responseText.match(/\[[\s\S]*\]/);
-    if (!jsonMatch) throw new Error('JSON 配列が見つかりません');
-
-    const parsed = JSON.parse(jsonMatch[0]) as Trend[];
-    return parsed.filter((t) => t.trend && t.description);
+    const parsed = await generateJson(llm, { prompt, schema: trendSchema, jsonSchema: trendJsonSchema, schemaName: 'trends' });
+    return parsed.trends.map((t) => (t.action ? { trend: t.trend, description: t.description, action: t.action } : { trend: t.trend, description: t.description }));
   } catch (error) {
-    console.warn('[ai] トレンド分析のパースに失敗:', (error as Error).message);
+    console.warn('[ai] トレンド分析に失敗:', error instanceof Error ? error.message : String(error));
     return [];
   }
 }

@@ -1,18 +1,46 @@
-import pLimit from 'p-limit';
-import { generateText } from './client.js';
+import { z } from 'zod';
+import { generateJson, type LlmConfig } from './client.js';
 import type { Article } from '../feeds/types.js';
 
-/** 1回の Gemini API 呼び出しで処理する記事数 */
+/** 1回の LLM 呼び出しで処理する記事数 */
 const BATCH_SIZE = 5;
 
-/** Gemini API への同時リクエスト数（10 RPM 制限に対応） */
-const GEMINI_CONCURRENCY = 2;
-
-/** リクエスト間の最小待機時間（ミリ秒）: 10 RPM = 6秒/リクエスト */
+/**
+ * リクエストの間隔（ミリ秒）。10 RPM = 6秒/リクエスト。
+ * バッチは直列に送り、2 本目以降の前にこの時間だけ待つ。旧実装は並列 2 本で
+ * 各 6 秒待っていたため、実効は 20 RPM に達しえた。
+ */
 const REQUEST_INTERVAL_MS = 6000;
 
-/** JSON レスポンスから要約を取得できなかった記事の最大コンテンツ長 */
+/** 要約に渡す本文の最大長 */
 const CONTENT_EXCERPT_LENGTH = 500;
+
+/** 要約の応答スキーマ（検証用） */
+const summarySchema = z.object({ items: z.array(z.object({ id: z.string(), summary: z.string().min(1) })) });
+
+/** 要約の応答スキーマ（構造化出力として API に渡す） */
+const summaryJsonSchema = {
+  type: 'object',
+  properties: {
+    items: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          id: { type: 'string', description: '記事ID' },
+          summary: { type: 'string', description: '日本語で2〜3文の要約' },
+        },
+        required: ['id', 'summary'],
+      },
+    },
+  },
+  required: ['items'],
+};
+
+/** batchSummarize に差し込める依存 */
+export interface SummarizeDeps {
+  sleep?: (ms: number) => Promise<void>;
+}
 
 /** sleep ユーティリティ */
 function sleep(ms: number): Promise<void> {
@@ -20,17 +48,17 @@ function sleep(ms: number): Promise<void> {
 }
 
 /**
- * 5記事をまとめて1回の Gemini API 呼び出しで要約する。
- * @returns 記事 ID をキー、要約テキストを値とする Map
+ * 5記事をまとめて1回の LLM 呼び出しで要約する。
+ * @returns 記事 ID をキー、要約テキストを値とする Map。依頼した記事の ID だけを含む
  */
 async function summarizeBatch(
-  apiKey: string,
+  llm: LlmConfig,
   articles: Article[]
 ): Promise<Map<string, string>> {
   const articleList = articles
     .map((a, i) => {
       const excerpt = a.content?.slice(0, CONTENT_EXCERPT_LENGTH) ?? '（本文なし）';
-      return `[${i + 1}] タイトル: ${a.title}\n    URL: ${a.url}\n    本文抜粋: ${excerpt}`;
+      return `[${i + 1}] id: "${a.id}"\n    タイトル: ${a.title}\n    URL: ${a.url}\n    本文抜粋: ${excerpt}`;
     })
     .join('\n\n');
 
@@ -43,67 +71,58 @@ async function summarizeBatch(
 2. 実装・試用できるか（GitHub リポジトリ名 / API / ライブラリ名）
 3. 具体的な数値・ベンチマーク・パラメータ数
 
-必ず以下の JSON 配列形式のみで返すこと（コードブロックや説明文は不要）:
-[{"id": "記事ID", "summary": "要約テキスト"}]
+各要素の id には、記事リストの id をそのまま使ってください。
 
 記事リスト:
-${articleList}
+${articleList}`;
 
-各記事の id フィールドには以下の値を使用してください:
-${articles.map((a, i) => `[${i + 1}] id: "${a.id}"`).join('\n')}`;
+  const parsed = await generateJson(llm, { prompt, schema: summarySchema, jsonSchema: summaryJsonSchema, schemaName: 'summaries' });
 
-  const responseText = await generateText(apiKey, prompt);
-
+  const wanted = new Set(articles.map((a) => a.id));
   const summaryMap = new Map<string, string>();
-
-  try {
-    // JSON 部分を抽出してパース
-    const jsonMatch = responseText.match(/\[[\s\S]*\]/);
-    if (!jsonMatch) throw new Error('JSON 配列が見つかりません');
-
-    const parsed = JSON.parse(jsonMatch[0]) as { id: string; summary: string }[];
-    for (const item of parsed) {
-      if (item.id && item.summary) {
-        summaryMap.set(item.id, item.summary);
-      }
-    }
-  } catch (error) {
-    console.warn('[ai] 要約レスポンスのパースに失敗:', (error as Error).message);
+  for (const item of parsed.items) {
+    if (wanted.has(item.id)) summaryMap.set(item.id, item.summary);
   }
-
   return summaryMap;
 }
 
 /**
- * 全記事を BATCH_SIZE 件ずつ Gemini API でバッチ要約する。
- * 要約取得に失敗した記事の summary は null のまま保持する。
+ * 全記事を BATCH_SIZE 件ずつ LLM でバッチ要約する。
+ * バッチは直列に送り、失敗したバッチはそのバッチの記事だけ summary を null のまま残す。
+ * 1 バッチの失敗で全件の要約を捨てることはしない。
+ * @param llm LLM の接続先
+ * @param articles 要約する記事
+ * @param deps テスト用の差し替え
  */
 export async function batchSummarize(
-  apiKey: string,
-  articles: Article[]
+  llm: LlmConfig,
+  articles: Article[],
+  deps: SummarizeDeps = {}
 ): Promise<Article[]> {
-  const limit = pLimit(GEMINI_CONCURRENCY);
-  const batches: Article[][] = [];
+  const wait = deps.sleep ?? sleep;
+  const mergedMap = new Map<string, string>();
+  let failedBatches = 0;
+  let batchCount = 0;
 
   for (let i = 0; i < articles.length; i += BATCH_SIZE) {
-    batches.push(articles.slice(i, i + BATCH_SIZE));
+    if (batchCount > 0) await wait(REQUEST_INTERVAL_MS);
+    batchCount++;
+    const batch = articles.slice(i, i + BATCH_SIZE);
+    try {
+      for (const [id, summary] of await summarizeBatch(llm, batch)) {
+        mergedMap.set(id, summary);
+      }
+    } catch (error) {
+      failedBatches++;
+      console.warn(
+        `[ai] バッチ ${batchCount} の要約に失敗しました（${batch.length}件は本文の抜粋で代用）:`,
+        error instanceof Error ? error.message : String(error)
+      );
+    }
   }
 
-  const summaryMaps = await Promise.all(
-    batches.map((batch, index) =>
-      limit(async () => {
-        if (index > 0) await sleep(REQUEST_INTERVAL_MS);
-        return summarizeBatch(apiKey, batch);
-      })
-    )
-  );
-
-  // 全バッチの要約 Map をマージ
-  const mergedMap = new Map<string, string>();
-  for (const map of summaryMaps) {
-    for (const [id, summary] of map) {
-      mergedMap.set(id, summary);
-    }
+  if (failedBatches > 0) {
+    console.warn(`[ai] 要約に失敗したバッチ: ${failedBatches}/${batchCount}`);
   }
 
   return articles.map((article) => ({
