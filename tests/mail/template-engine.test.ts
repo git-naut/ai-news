@@ -94,6 +94,31 @@ describe('renderTemplate', () => {
     expect(text).toContain('GPT-5 Released by OpenAI');
   });
 
+  it('プレーンテキストでは記号をエスケープせずそのまま出す', () => {
+    const special: Article = {
+      ...mockArticles[0]!,
+      title: `AT&T's "GPT" <beta>`,
+      summary: `要約 A&B <tag> "引用" 'x'`,
+    };
+    const data = buildTemplateData([special], [], '2026年03月23日 09:00 JST');
+    const text = renderTemplate('digest-text', data);
+    expect(text).toContain(`■ AT&T's "GPT" <beta>`);
+    expect(text).toContain(`要約 A&B <tag> "引用" 'x'`);
+    expect(text).not.toMatch(/&(amp|lt|gt|quot|#x27|#39|#x60|#x3D);/);
+  });
+
+  it('HTML では記事タイトルの <script> をエスケープしたままにする', () => {
+    const evil: Article = {
+      ...mockArticles[0]!,
+      title: '<script>alert(1)</script>',
+      summary: 'A&B',
+    };
+    const data = buildTemplateData([evil], [], '2026年03月23日 09:00 JST');
+    const html = renderTemplate('digest', data);
+    expect(html).not.toContain('<script>alert(1)</script>');
+    expect(html).toContain('&lt;script&gt;alert(1)&lt;/script&gt;');
+  });
+
   it('right が null の場合でもHTMLレンダリングが壊れない', () => {
     const data = buildTemplateData(mockArticles, [], '2026年03月23日 09:00 JST');
     expect(() => renderTemplate('digest', data)).not.toThrow();
