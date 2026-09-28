@@ -407,3 +407,113 @@ DEP-3 は入れない依存の表を持ち、package.json のどの区分にも�
 並列の修正エージェントは node_modules を本体から symlink している。本体で `pnpm add` や
 `pnpm remove` を打つと、別の worktree のテストと型検査から依存が消える。2026-09-29 に旧 SDK を
 2 回消してしまい、その都度 lockfile から入れ直した。エージェントが走っている間は依存を変えない。
+
+## 段3 の既知バグ（2026-09-29、並列の修正と敵対的な検証）
+
+<!-- L:UNIT-101 family=unit check=UNIT-1 mutation=m_unit_101 -->
+### 1記事の壊れたリンクがフィード全体を道連れにする
+
+相対リンクや `http://[::1` のような壊れたリンクを1件含むフィードは、記事が1件も配信されなかった。normalizeItem の `new URL(url).origin` が例外を投げ、fetchFeed がそれをフィード単位の try/catch で受けて空配列を返していたのが原因。
+記事単位の正規化関数は例外を投げない約束にした。resolveLink で `new URL(link, base)` を try/catch で包み、解決できないリンクと http(s) 以外のリンクはその記事だけ null にする。相対リンクは第3引数 baseUrl（省略時は source.url）で絶対 URL に直す。元から絶対 URL のものは記事 ID が変わらないよう表記をそのまま残す。
+fetcher.ts のループ内に try/catch を足す案は採らなかった。呼び出し側ごとに守りを書くと、次に normalizeItem を使う箇所で同じ穴が開くため。
+
+<!-- L:UNIT-102 family=unit mutation=m_none_101 -->
+### normalizeItem のコメントは UNIT が見ない軸
+
+UNIT はテストの合否と型だけを見る。相対リンクの説明コメントを言い換えても振る舞いは変わらないので、捕まらないのが正しい。
+
+<!-- L:UNIT-111 family=unit check=UNIT-1 mutation=m_unit_111 -->
+### テキストメールのテンプレートにも Handlebars の HTML エスケープがかかる
+
+AT&T's "GPT" <beta> という題の記事が、テキストメールでは AT&amp;T&#x27;s &quot;GPT&quot; &lt;beta&gt; の形で届いていた。
+digest-text.hbs も digest.hbs と同じ Handlebars.compile(source) で組まれていた。そのため {{ }} の既定のエスケープがプレーンテキストにもかかっていた。
+直し方として、template-engine.ts の PLAIN_TEXT_TEMPLATES に名前を載せたテンプレートだけを noEscape: true で組むようにした。HTML 版は既定のエスケープのままで、<script> は実体参照で残る。これはテストで固定してある。
+各変数を triple-stash {{{ }}} で書く案は採らなかった。テキスト側に項目を足すたびに書き忘れると同じ欠陥が戻り、その差分はレビューでも目に入りにくい。
+名前の末尾が -text かどうかで決める案も見送った。HTML のテンプレートに誤ってその名前を付けただけで XSS 対策が外れてしまうので、明示した名前だけを外す形にしている。
+
+<!-- L:UNIT-112 family=unit mutation=m_none_111 -->
+### PLAIN_TEXT_TEMPLATES の説明コメントは UNIT の監視対象外
+
+UNIT が見るのは vitest の合否と tsc の型だけで、JSDoc の文言が変わっても実行結果は同じになる。そのため、この変異を捕まえないのが正しい。
+
+<!-- L:UNIT-121 family=unit check=UNIT-1 mutation=m_unit_121 -->
+### URL の正規化でクエリを丸ごと捨てると別記事が1件に潰れる
+
+`news.ycombinator.com/item?id=1` と `?id=2` が同じ記事として重複除去され、片方が配信から消えていた。normalizeUrl が utm を外すつもりで search を空にし、さらに URL 全体を小文字にしていたのが原因。HN の id や YouTube の v のように、クエリ自体が記事を識別するサイトがある。パスの大小を区別するサイトもある。
+直し方として、小文字にするのはスキームとホストだけにした。クエリからは utm_* と fbclid、gclid、mc_cid、mc_eid、ref、ref_src だけを外し、残りはキー順に並べる。
+逆に「残すパラメータ」を許可リストで持つ案は採らなかった。未知のサイトが来るたびに潰れる側へ倒れ、今回と同じ欠落を黙って起こすからだ。外す側を列挙すれば、漏れても重複が1件残るだけで済む。
+
+<!-- L:UNIT-122 family=unit mutation=m_none_121 -->
+### normalizeUrl のコメントは UNIT の見ていない軸
+
+UNIT はテストの合否と型だけを見る。組み立て直前のコメントを言い換えても挙動は変わらないので、捕まえないのが正しい。
+
+<!-- L:UNIT-131 family=unit check=UNIT-1 mutation=m_unit_131 -->
+### 英字キーワードを includes() で探すと storage の中の rag を拾う
+
+classifyArticle は小文字化した本文に includes() を当てていた。そのため storage や average の rag、google の go、rapid の api、iso3 の o3 がそれぞれカテゴリを決めていた。語の途中に同じ綴りが現れることを部分一致は区別できない。
+ASCII だけのキーワードは前後が英数字でない位置でのみ一致させ、c++ や gpt-5 の記号は退避してから正規表現に埋め、末尾の複数形 s は許した。日本語を含むキーワードは語の境界が決まらないので部分一致のまま残している。
+\b を使う案は採らなかった。c++ のように記号で終わるキーワードでは \b が効かず、日本語の直後に英字が続く「RAGを使う」でも境界の扱いが揺れるため、英数字の否定先読みと後読みで書いた。
+
+<!-- L:UNIT-132 family=unit mutation=m_none_131 -->
+### 退避処理のコメントは UNIT の見る軸ではない
+
+UNIT はテストの合否と型だけを見る。matchesKeyword のコメントを言い換えても振る舞いは変わらないので、捕まえてはいけない。
+
+<!-- L:UNIT-141 family=unit check=UNIT-1 mutation=m_unit_141 -->
+### 配信時刻を起動時に決めると、待った分だけ件名の時刻がずれる
+
+UTC 23:45 に起動して 00:00 まで待つ primary の件名と本文が、09:00 JST に届いたのに「08:45 JST」と表示していた。
+src/index.ts が main の先頭で formatJstDate(new Date()) を呼んでおり、取得、要約、SEND_AT_UTC の待ちの前の時刻が残っていた。
+修正では待ちを先に computeSendDelay で求め、plannedSendTime(now, delay) が返す時刻でテンプレートと件名を描く。plannedSendTime は純関数として切り出し、23:45:10Z に 14 分 50 秒を足すと 09:00 JST になることをテストで押さえた。
+先に待ってから描画する案も考えたが、採らなかった。main の順番を入れ替えるだけでは単体テストに載らず、同じずれが戻っても誰も気づけない。
+
+<!-- L:UNIT-142 family=unit mutation=m_none_141 -->
+### plannedSendTime の説明コメントは UNIT の監視対象ではない
+
+UNIT が見ているのはテストの合否と型だけで、JSDoc の言い回しを変えても挙動は変わらない。ここで検査が落ちたら、検査がコメントに依存しているということになる。
+
+<!-- L:UNIT-151 family=unit check=UNIT-1 mutation=m_unit_151 -->
+### 取得窓を取得元ごとに直書きすると片方だけ週末分を落とす
+
+RSS は 36 時間、NewsData は 24 時間と別々に書かれていた。そのため月曜朝の配信では、NewsData から来た土日の記事だけが一件も残らなかった。
+36 時間という値は週末の取りこぼしを防ぐために決めたもので、その理由は fetcher.ts のコメントにしか残っていなかった。client.ts を書いた側はこのコメントを見ていなかった。
+src/config/lookback.ts に LOOKBACK_HOURS と isWithinLookback を置き、両方の取得元がこれを読むように変えた。テストでは 30 時間前の記事が両方で残り、40 時間前の記事が両方で落ちることを確かめる。
+取得元ごとに窓の長さを引数で渡す案も考えたが採らなかった。値を分けられる形にすると、今回と同じずれを再び書けてしまうからだ。
+
+<!-- L:UNIT-152 family=unit mutation=m_none_151 -->
+### LOOKBACK_HOURS の説明コメントは UNIT の監視対象外
+
+UNIT はテストの合否と型だけを見る。36 時間を選んだ理由を書いたコメントを言い換えても、どの結果も変わらない。
+
+<!-- L:UNIT-161 family=unit check=UNIT-1 mutation=m_unit_161 -->
+### 語の境界を厳密にすると、長い語の派生形を取りこぼす
+
+storage の中の rag を拾わないよう、英字キーワードを語の境界で照合した。すると agentic・gpt4o・llama3・
+llamaindex が agent・gpt・llama に当たらなくなった（検証役が見つけた）。4 文字以下の語は後ろに英字が
+続けば一致させず、数字は許す。数字で終わる語（gpt-5、o3）は後ろの数字も許さない。英字で終わる
+5 文字以上の語は前方一致にした。
+
+<!-- L:UNIT-162 family=unit check=UNIT-1 mutation=m_unit_162 -->
+### 相対リンクの基準は XML の置き場所ではなくサイトの link
+
+normalizeItem に基準の引数を足しても、呼び出し側の fetcher が渡していなかった。Anthropic の
+フィードは raw.githubusercontent.com にあり、そこを基準にすると存在しない URL になる。fetcher の
+テストに、XML とサイトが別ホストのフィードを足してから直した。
+
+<!-- L:UNIT-163 family=unit check=UNIT-1 mutation=m_unit_163 -->
+### テキスト版のエスケープを外す修正は、HTML 側の歯も要る
+
+HTML のエスケープを守るテストは修正前から緑なので、テキスト版の変異だけでは HTML 側の退行を
+捕まえられるか分からない。平文のテンプレートの集合に digest を足す変異を置いた。
+
+<!-- L:UNIT-164 family=unit check=UNIT-1 mutation=m_unit_164 -->
+### 取得窓は境界の値で固定する
+
+30 時間と 40 時間の記事だけで確かめていたので、31〜39 のどれにしてもテストが通った。36 時間
+ちょうどを内側、1 ミリ秒古いものを外側とするテストで固定した。
+
+<!-- L:UNIT-165 family=unit mutation=m_none_161 -->
+### fetcher のコメントの言い換えで unit が反応しないこと
+
+UNIT はテストの合否と型だけを見る。

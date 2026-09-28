@@ -44,6 +44,22 @@ vi.mock('rss-parser', () => {
         if (url.includes('error')) {
           return Promise.reject(new Error('Network error'));
         }
+        // フィードの XML はサイトと別のホストにあり、記事のリンクは相対（Anthropic の第三者フィードの形）
+        if (url.includes('relative')) {
+          return Promise.resolve({
+            link: 'https://site.example.com/',
+            items: [{ title: 'Relative Link Post', link: '/engineering/post', isoDate: new Date(now).toISOString() }],
+          });
+        }
+        // 壊れたリンクの記事が1件混ざったフィード
+        if (url.includes('mixed')) {
+          return Promise.resolve({
+            items: [
+              { title: 'Broken Link', link: 'http://[::1', isoDate: new Date(now).toISOString() },
+              { title: 'Good Link', link: 'https://example.com/good', isoDate: new Date(now).toISOString() },
+            ],
+          });
+        }
         return Promise.resolve({ items });
       }),
     })),
@@ -95,5 +111,20 @@ describe('fetchAllFeeds', () => {
     // エラーソースはスキップされ、正常ソースの3件のみ返る
     expect(articles.length).toBe(3);
     expect(articles.every((a) => a.sourceName !== 'Error Source')).toBe(true);
+  });
+});
+
+describe('fetchAllFeeds（リンクの解決）', () => {
+  const base = { category: 'AI/LLM' as const, language: 'en' as const, maxItems: 5 };
+
+  it('相対リンクはフィードの XML の場所ではなく、フィードが示すサイトの link を基準に解決する', async () => {
+    const [a] = await fetchAllFeeds([{ ...base, name: 'Rel', url: 'https://raw.example.com/x/relative.xml' }]);
+    expect(a?.url).toBe('https://site.example.com/engineering/post');
+    expect(a?.sourceUrl).toBe('https://site.example.com');
+  });
+
+  it('壊れたリンクの記事が1件混ざっても、同じフィードの正常な記事は fetchFeed を通って残る', async () => {
+    const out = await fetchAllFeeds([{ ...base, name: 'Mixed', url: 'https://example.com/mixed.xml' }]);
+    expect(out.map((a) => a.title)).toEqual(['Good Link']);
   });
 });

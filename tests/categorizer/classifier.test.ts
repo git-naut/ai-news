@@ -83,6 +83,25 @@ describe('matchesKeyword', () => {
     expect(matchesKeyword('gpt-5.4 is out', 'gpt-5')).toBe(true);
     expect(matchesKeyword('gpt-50 is out', 'gpt-5')).toBe(false);
   });
+
+  it.each([
+    ['agentic ai is here', 'agent'],
+    ['gpt4o launched', 'gpt'],
+    ['llama3 released', 'llama'],
+    ['llamaindex 0.12', 'llama'],
+    ['pythonic code', 'python'],
+  ])('英字で終わる語は後ろの数字を許し、5 文字以上なら前方一致も許す（%s ← %s）', (text, kw) => {
+    expect(matchesKeyword(text, kw)).toBe(true);
+  });
+
+  it.each([
+    ['rusty nail', 'rust'],
+    ['soraya wins', 'sora'],
+    ['goes home', 'go'],
+    ['o30 filter', 'o3'],
+  ])('4 文字以下の語は後ろに英字が続けば一致させない。数字で終わる語は後ろの数字も許さない（%s ← %s）', (text, kw) => {
+    expect(matchesKeyword(text, kw)).toBe(false);
+  });
 });
 
 describe('buildSourceCategoryMap', () => {

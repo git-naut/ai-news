@@ -9,7 +9,8 @@ on:
 jobs:
   test:
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    # 逆テストは unit 系統（1 回 35〜50 秒）を変異ごとに回すため長い。手元の 8 並列で 467 秒（2026-09-29）
+    timeout-minutes: 30
 
     steps:
       - name: Checkout

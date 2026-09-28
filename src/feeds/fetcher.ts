@@ -35,7 +35,9 @@ async function fetchFeed(source: FeedSource): Promise<RawArticle[]> {
     for (const item of feed.items) {
       if (articles.length >= source.maxItems) break;
 
-      const article = normalizeItem(item, source);
+      // 相対リンクはフィードが示すサイトの link を基準にする。XML の置き場所（raw.githubusercontent.com など）は
+      // サイトと別のホストのことがあり、そこを基準にすると存在しない URL になる
+      const article = normalizeItem(item, source, feed.link);
       if (!article) continue;
       // 取得窓の外の記事は捨てる（窓の長さは config/lookback.ts で NewsData と共有）
       if (!isWithinLookback(article.publishedAt, now)) continue;
