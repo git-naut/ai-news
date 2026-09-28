@@ -12,7 +12,7 @@ importers:
         specifier: ^0.24.1
         version: 0.24.1
       axios:
-        specifier: ^1.7.9
+        specifier: 1.13.6
         version: 1.13.6
       date-fns:
         specifier: ^4.1.0

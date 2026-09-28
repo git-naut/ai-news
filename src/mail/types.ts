@@ -39,10 +39,17 @@ export interface DigestTemplateData {
   hasTrends: boolean;
 }
 
+/**
+ * 配信の種類。primary は cron-job.org 起動の定時配信、backup は primary が
+ * 届かなかった日に GitHub schedule が送る予備配信、manual は手動の即時送信。
+ */
+export type DeliveryKind = 'primary' | 'backup' | 'manual';
+
 /** メール送信に必要なデータ */
 export interface EmailPayload {
   html: string;
   text: string;
   totalCount: number;
   deliveryDate: string;
+  deliveryKind: DeliveryKind;
 }
