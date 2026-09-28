@@ -18,6 +18,18 @@ vi.mock('rss-parser', () => {
       contentSnippet: 'Latest benchmark results.',
     },
     {
+      title: 'Weekend Article 30 Hours Ago',
+      link: 'https://example.com/weekend-30h',
+      isoDate: new Date(now - 30 * 60 * 60 * 1000).toISOString(), // 30時間前（週末の記事）
+      contentSnippet: 'Posted on the weekend.',
+    },
+    {
+      title: 'Stale Article 40 Hours Ago',
+      link: 'https://example.com/stale-40h',
+      isoDate: new Date(now - 40 * 60 * 60 * 1000).toISOString(), // 40時間前（取得窓の外）
+      contentSnippet: 'Too old for the lookback window.',
+    },
+    {
       title: 'Old Article from Last Week',
       link: 'https://example.com/old-article',
       isoDate: new Date(now - 8 * 24 * 60 * 60 * 1000).toISOString(), // 8日前
@@ -56,11 +68,13 @@ describe('fetchAllFeeds', () => {
     vi.clearAllMocks();
   });
 
-  it('過去24時間以内の記事のみ取得する', async () => {
+  it('過去36時間以内の記事のみ取得する（30時間前は残し、40時間前と8日前は落とす）', async () => {
     const articles = await fetchAllFeeds(mockSources);
-    // 8日前の記事はフィルタされる
-    expect(articles.length).toBe(2);
-    expect(articles.every((a) => a.title !== 'Old Article from Last Week')).toBe(true);
+    const titles = articles.map((a) => a.title);
+    expect(articles.length).toBe(3);
+    expect(titles).toContain('Weekend Article 30 Hours Ago');
+    expect(titles).not.toContain('Stale Article 40 Hours Ago');
+    expect(titles).not.toContain('Old Article from Last Week');
   });
 
   it('ソース名を正しく設定する', async () => {
@@ -78,8 +92,8 @@ describe('fetchAllFeeds', () => {
     };
     // 正常ソース1つ + エラーソース1つ
     const articles = await fetchAllFeeds([...mockSources, errorSource]);
-    // エラーソースはスキップされ、正常ソースの2件のみ返る
-    expect(articles.length).toBe(2);
+    // エラーソースはスキップされ、正常ソースの3件のみ返る
+    expect(articles.length).toBe(3);
     expect(articles.every((a) => a.sourceName !== 'Error Source')).toBe(true);
   });
 });

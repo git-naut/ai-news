@@ -20,7 +20,7 @@ vi.mock('axios', () => ({
 import axios from 'axios';
 import { fetchNewsApi } from '../../src/news-api/client.js';
 
-// フィクスチャの記事日付 (2026-03-23 01:00:00 UTC) が 24h フィルターを通るよう時刻を固定
+// フィクスチャの記事日付 (2026-03-23 01:00:00 UTC) が取得窓（36h）を通るよう時刻を固定
 const FIXED_NOW = new Date('2026-03-23T10:00:00Z').getTime();
 
 describe('fetchNewsApi', () => {
@@ -49,6 +49,25 @@ describe('fetchNewsApi', () => {
     const articles = await fetchNewsApi('test-api-key');
     const jaArticle = articles.find((a) => a.title.includes('日本'));
     expect(jaArticle?.language).toBe('ja');
+  });
+
+  it('RSS と同じ36時間の取得窓を使う（30時間前は残し、40時間前は落とす）', async () => {
+    const hoursAgo = (h: number): string => new Date(FIXED_NOW - h * 60 * 60 * 1000).toISOString();
+    const base = fixtureData.results[0];
+    vi.mocked(axios.get).mockResolvedValue({
+      data: {
+        status: 'success',
+        results: [
+          { ...base, article_id: 'w30', title: 'Weekend Article 30 Hours Ago', pubDate: hoursAgo(30) },
+          { ...base, article_id: 's40', title: 'Stale Article 40 Hours Ago', pubDate: hoursAgo(40) },
+        ],
+      },
+    });
+
+    const articles = await fetchNewsApi('test-api-key');
+    const titles = articles.map((a) => a.title);
+    expect(titles).toContain('Weekend Article 30 Hours Ago');
+    expect(titles).not.toContain('Stale Article 40 Hours Ago');
   });
 
   it('API エラー時は空配列を返す（パイプライン停止しない）', async () => {
