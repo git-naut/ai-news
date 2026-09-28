@@ -89,8 +89,8 @@ export function classifyArticles(
 }
 
 /**
- * RSS_FEEDS 配列から sourceName → category のマップを構築する。
+ * フィードや HN の検索条件の一覧から sourceName → category のマップを構築する。
  */
-export function buildSourceCategoryMap(sources: FeedSource[]): Map<string, Category> {
+export function buildSourceCategoryMap(sources: ReadonlyArray<Pick<FeedSource, 'name' | 'category'>>): Map<string, Category> {
   return new Map(sources.map((s) => [s.name, s.category]));
 }

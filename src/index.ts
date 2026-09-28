@@ -2,6 +2,7 @@ import { env } from './config/env.js';
 import { RSS_FEEDS } from './config/feeds.js';
 import { fetchAllFeeds } from './feeds/fetcher.js';
 import { fetchNewsApi } from './news-api/client.js';
+import { fetchHackerNews, HN_QUERIES, hnSourceName } from './hn/client.js';
 import { deduplicate } from './categorizer/deduplicator.js';
 import { classifyArticles, buildSourceCategoryMap } from './categorizer/classifier.js';
 import { batchSummarize } from './ai/summarizer.js';
@@ -21,21 +22,25 @@ async function main(): Promise<void> {
   const startTime = Date.now();
   console.log('[ai-news] 開始:', new Date().toISOString());
 
-  // Step 1: ニュース取得（RSS + News API を並列実行）
+  // Step 1: ニュース取得（RSS + HN + News API を並列実行）
   console.log('[ai-news] ニュース取得中...');
-  const [rssArticles, apiArticles] = await Promise.all([
+  const [rssArticles, hnArticles, apiArticles] = await Promise.all([
     fetchAllFeeds(RSS_FEEDS),
+    fetchHackerNews(HN_QUERIES),
     fetchNewsApi(env.NEWS_API_KEY),
   ]);
 
-  const allRaw = [...rssArticles, ...apiArticles];
-  console.log(`[ai-news] 取得合計: ${allRaw.length}件 (RSS: ${rssArticles.length}, API: ${apiArticles.length})`);
+  const allRaw = [...rssArticles, ...hnArticles, ...apiArticles];
+  console.log(`[ai-news] 取得合計: ${allRaw.length}件 (RSS: ${rssArticles.length}, HN: ${hnArticles.length}, API: ${apiArticles.length})`);
 
   // Step 2: 重複排除 → キーワードベースカテゴリ分類
   const deduped = deduplicate(allRaw);
   console.log(`[ai-news] 重複排除後: ${deduped.length}件`);
 
-  const sourceCategoryMap = buildSourceCategoryMap(RSS_FEEDS);
+  const sourceCategoryMap = buildSourceCategoryMap([
+    ...RSS_FEEDS,
+    ...HN_QUERIES.map((q) => ({ name: hnSourceName(q), category: q.category })),
+  ]);
   const classified = classifyArticles(deduped, sourceCategoryMap);
 
   // Step 3: LLM（BytePlus ModelArk）による要約・トレンド分析

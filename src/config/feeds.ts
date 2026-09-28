@@ -58,47 +58,7 @@ export const RSS_FEEDS: FeedSource[] = [
     maxItems: 5,
   },
 
-  // --- Hacker News フィルター（公式 RSS なし企業の代替）---
-  {
-    // 一般 AI/LLM 議論
-    name: 'Hacker News (AI/LLM)',
-    url: 'https://hnrss.org/newest?q=AI+LLM&points=50',
-    category: 'AI/LLM',
-    language: 'en',
-    maxItems: 8,
-  },
-  {
-    // Llama 4 Scout / Llama 4 Maverick (Meta)
-    name: 'Hacker News (Llama/Meta)',
-    url: 'https://hnrss.org/newest?q=Llama+Meta&points=30',
-    category: 'AI/LLM',
-    language: 'en',
-    maxItems: 5,
-  },
-  {
-    // DeepSeek-V3, DeepSeek-R1
-    name: 'Hacker News (DeepSeek)',
-    url: 'https://hnrss.org/newest?q=DeepSeek&points=50',
-    category: 'AI/LLM',
-    language: 'en',
-    maxItems: 5,
-  },
-  {
-    // Mistral Large 3, Mistral Small 4, Devstral
-    name: 'Hacker News (Mistral)',
-    url: 'https://hnrss.org/newest?q=Mistral&points=30',
-    category: 'AI/LLM',
-    language: 'en',
-    maxItems: 5,
-  },
-  {
-    // Grok 3, Grok 4 (xAI)
-    name: 'Hacker News (Grok/xAI)',
-    url: 'https://hnrss.org/newest?q=Grok+xAI&points=30',
-    category: 'AI/LLM',
-    language: 'en',
-    maxItems: 5,
-  },
+  // Hacker News は hnrss.org をやめ、公式の検索 API で取る（src/hn/client.ts の HN_QUERIES）
 
   // --- 日本語ソース ---
   {

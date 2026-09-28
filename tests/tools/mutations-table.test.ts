@@ -23,10 +23,12 @@ const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 let table: Array<{ file: string; mutation: Mutation }> = [];
 let checkIds = new Set<string>();
 
+// 変異のモジュールを全部読み込むので遅い。72 本のとき単独で 3.6〜4.0 秒、unit 系統が tsc 3 本と並べて
+// 走らせると既定の 10 秒を超えた（2026-09-29）。変異は増え続けるので上限を広めに取る
 beforeAll(async () => {
   table = await discoverMutations(ROOT);
   checkIds = await collectCheckIds(makeContext(ROOT));
-});
+}, 60_000);
 
 describe('変異の表', () => {
   it('変異がある', () => {

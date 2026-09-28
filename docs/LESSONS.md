@@ -517,3 +517,80 @@ HTML のエスケープを守るテストは修正前から緑なので、テキ
 ### fetcher のコメントの言い換えで unit が反応しないこと
 
 UNIT はテストの合否と型だけを見る。
+
+## Hacker News（hnrss から Algolia へ）
+
+<!-- L:HN-001 family=unit check=UNIT-1 mutation=m_unit_171 -->
+### HN の検索はタイトルに限り、表記ゆれを許さない
+
+Algolia の query は既定でタイトル・URL・本文・投稿者名に当たり、タイポも許す。2026-09-29 の実測では
+LLM が「Have an LLC」に、Grok が無関係な記事に当たった。`restrictSearchableAttributes=title` と
+`typoTolerance=false` を付けると、LLM の結果は正しい1件だけになった。
+
+<!-- L:HN-002 family=unit check=UNIT-1 mutation=m_unit_172 -->
+### Ask HN には url のキーが無い
+
+値が無いときは null ではなくキーごと省かれる。url の無い投稿は `news.ycombinator.com/item?id=` の
+ページを URL にし、story_text の HTML を剥がして本文にする。
+
+<!-- L:HN-003 family=unit check=UNIT-1 mutation=m_unit_173 -->
+### 1 本の検索の失敗を HN 全体に広げない
+
+hnrss.org では 5 本中 4 本が 502 やタイムアウトになる日があった（同じ日に 200 を返したこともある）。
+Algolia でも検索 1 本ごとに失敗を閉じ込め、他の検索の記事は残す。
+
+<!-- L:HN-004 family=unit check=UNIT-1 mutation=m_unit_174 -->
+### HN の取得窓も LOOKBACK_HOURS を読む
+
+取得元ごとに窓を直書きすると、RSS と NewsData で起きた食い違いが HN でも起きる。
+URL のテストで `created_at_i>` の値まで固定した。
+
+<!-- L:HN-005 family=unit mutation=m_none_171 -->
+### HN の失敗ログの言い換えで unit が反応しないこと
+
+UNIT はテストの合否と型だけを見る。
+
+<!-- L:HN-006 family=unit -->
+### GET に body を付けると fetch が例外を投げる
+
+HN のクライアントで、呼び出し口の型に合わせて GET に空文字の body を渡しかけた。本物の fetch は
+GET や HEAD に body があると TypeError を投げるが、偽の fetch を使うテストは通ってしまう。型の body を
+省略可能にし、GET では渡さない。型を変えたら、tests/ の型検査が偽の fetch のずれを捕まえた。
+
+## 文書
+
+<!-- L:DOC-001 family=doc check=DOC-1 mutation=m_doc_001 -->
+### README の本数は取得元を足し引きしても追いつかない
+
+3 月の README は「TechCrunch など 10 ソース」と書いたまま、実物は 13 本になっていた。そこに TechCrunch は無い。
+DOC-1 は README の「RSS N 本」と「Hacker News の検索 N 本」を、feeds.ts と hn/client.ts の配列の件数と比べる。
+
+<!-- L:DOC-002 family=doc check=DOC-1 mutation=m_doc_004 -->
+### HN の本数も README と突き合わせる
+
+hnrss から Algolia へ移したように、HN の検索は RSS と別の場所で増減する。
+
+<!-- L:DOC-003 family=doc check=DOC-2 mutation=m_doc_002 -->
+### モデルを替えたら README も替える
+
+3 月の README は Gemini の無料枠を前提に書かれ、LLM を移した後も残っていた。DOC-2 は client.ts の
+主と予備のモデル ID が README にあることを見る。
+
+<!-- L:DOC-004 family=doc check=DOC-3 mutation=m_doc_003 -->
+### README の Secrets の一覧はワークフローと集合で一致させる
+
+一覧から漏れた Secret は登録し損ね、起動直後に zod が落ちる。逆に、使っていない Secret が残ると
+消してよいかが分からない。DOC-3 は送信ジョブが読む `secrets.*` の集合と、README の一覧の集合を比べる。
+
+<!-- L:DOC-005 family=doc mutation=m_none_012 -->
+### Secrets の一覧の並び替えで DOC-3 が反応しないこと
+
+DOC-3 は集合で比べる。並び順は見ていない軸。
+
+<!-- L:CHK-016 family=unit check=UNIT-1 -->
+### 変異の表の健全性テストは、変異が増えるほど遅くなる
+
+beforeAll で変異のモジュールを全部読み込む。72 本のとき、単独では 3.6〜4.0 秒だった。unit 系統が
+vitest と tsc 3 本を同時に走らせる中では、既定の 10 秒を超えて「テストファイルが読み込めません」になった。
+テストの中身ではなく時間制限の問題なので、上限を 60 秒にした。単独で流して通るのに検査の中だけで
+落ちるときは、まず負荷と時間制限を疑う。

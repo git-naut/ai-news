@@ -41,7 +41,7 @@ export interface LlmConfig {
 /** fetch のうち、ここで使う部分だけの形。テストで差し替える */
 export type FetchLike = (
   url: string,
-  init: { method: string; headers: Record<string, string>; body: string; signal?: AbortSignal },
+  init: { method: string; headers: Record<string, string>; body?: string; signal?: AbortSignal },
 ) => Promise<{ ok: boolean; status: number; text(): Promise<string> }>;
 
 /** generateJson に差し込める依存 */

@@ -40,6 +40,7 @@ export const FAMILIES: readonly FamilyEntry[] = [
   { id: 'sec', prefix: 'SEC', load: async () => import('./sec.js') },
   { id: 'wf', prefix: 'WF', load: async () => import('./wf.js') },
   { id: 'dep', prefix: 'DEP', load: async () => import('./dep.js') },
+  { id: 'doc', prefix: 'DOC', load: async () => import('./doc.js') },
   { id: 'unit', prefix: 'UNIT', load: async () => import('./unit.js') },
   { id: 'lessons', prefix: 'LES', load: async () => import('./lessons.js') },
   { id: 'loop', prefix: 'LOOP', load: async () => import('./loop.js') },

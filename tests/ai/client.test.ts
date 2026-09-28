@@ -28,8 +28,8 @@ interface Call {
  */
 function fakeFetch(...replies: (unknown | number | Error)[]): FetchLike & { calls: Call[] } {
   const calls: Call[] = [];
-  const f = async (url: string, init: { headers: Record<string, string>; body: string }): Promise<{ ok: boolean; status: number; text(): Promise<string> }> => {
-    calls.push({ url, headers: init.headers, body: JSON.parse(init.body) as Record<string, unknown> });
+  const f = async (url: string, init: { headers: Record<string, string>; body?: string }): Promise<{ ok: boolean; status: number; text(): Promise<string> }> => {
+    calls.push({ url, headers: init.headers, body: JSON.parse(init.body ?? '{}') as Record<string, unknown> });
     const next = replies.shift();
     if (next === undefined) throw new Error('応答の用意が足りません');
     if (next instanceof Error) throw next;
