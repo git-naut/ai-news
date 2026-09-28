@@ -33,3 +33,10 @@ jobs:
 
       - name: Run type check
         run: pnpm typecheck
+
+      # 不変条件の検査と逆テスト（tools/check）。--all と --mutate は同時に走らせない
+      - name: Run invariant checks
+        run: pnpm check --all --no-write
+
+      - name: Run mutation tests
+        run: pnpm check --mutate -j 4

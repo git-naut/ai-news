@@ -38,6 +38,8 @@ export interface FamilyEntry {
 /** 登録済みの系統。足すときはここに1行足す。 */
 export const FAMILIES: readonly FamilyEntry[] = [
   { id: 'sec', prefix: 'SEC', load: async () => import('./sec.js') },
+  { id: 'wf', prefix: 'WF', load: async () => import('./wf.js') },
+  { id: 'dep', prefix: 'DEP', load: async () => import('./dep.js') },
   { id: 'lessons', prefix: 'LES', load: async () => import('./lessons.js') },
   { id: 'loop', prefix: 'LOOP', load: async () => import('./loop.js') },
 ];
