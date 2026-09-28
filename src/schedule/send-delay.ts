@@ -43,3 +43,18 @@ export function computeSendDelay(now: Date, sendAtUtc: string | undefined, maxWa
   const wait = target.getTime() - now.getTime();
   return wait <= maxWaitMs ? wait : 0;
 }
+
+/**
+ * 実際にメールを送る予定の時刻を返す。
+ *
+ * 件名と本文の配信時刻は、起動した時刻ではなくこの時刻で描画する。
+ * 起動時刻で描くと、UTC 23:45 に起動して 00:00（JST 09:00）まで待つ primary の件名が
+ * 「08:45 JST」になる。
+ *
+ * @param now 現在時刻（書き換えない）
+ * @param delayMs computeSendDelay が返した待ち（ミリ秒）
+ * @returns now に delayMs を足した新しい Date
+ */
+export function plannedSendTime(now: Date, delayMs: number): Date {
+  return new Date(now.getTime() + delayMs);
+}
