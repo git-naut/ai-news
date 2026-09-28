@@ -1,14 +1,30 @@
 import type { RawArticle } from '../feeds/types.js';
 
+/** 記事の同一性に関係しない追跡用パラメータ（完全一致） */
+const TRACKING_PARAMS = new Set(['fbclid', 'gclid', 'mc_cid', 'mc_eid', 'ref', 'ref_src']);
+
+/** 追跡用パラメータかどうか。utm_ で始まるものは全て追跡用とみなす */
+function isTrackingParam(key: string): boolean {
+  const lower = key.toLowerCase();
+  return lower.startsWith('utm_') || TRACKING_PARAMS.has(lower);
+}
+
 /**
- * URL を正規化する（クエリパラメータ・フラグメントを除去、小文字化）。
+ * URL を正規化する。
+ * スキームとホストだけを小文字にし、パスの大小は保つ（大小を区別するサイトがあるため）。
+ * フラグメントと末尾スラッシュは除去する。クエリは追跡用パラメータだけを外し、
+ * 残りはキー順に並べる。?id=1 と ?id=2 のように記事を識別するクエリを消すと、別記事が1件に潰れる。
  */
 export function normalizeUrl(url: string): string {
   try {
     const parsed = new URL(url);
-    parsed.search = '';
-    parsed.hash = '';
-    return parsed.toString().toLowerCase().replace(/\/$/, '');
+    const kept = [...parsed.searchParams]
+      .filter(([key]) => !isTrackingParam(key))
+      .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+    const search = new URLSearchParams(kept).toString();
+    const path = parsed.pathname.replace(/\/$/, '');
+    // URL は scheme と host を小文字化済み。hash は組み立てに含めないので落ちる
+    return `${parsed.protocol}//${parsed.host}${path}${search ? `?${search}` : ''}`;
   } catch {
     return url.toLowerCase();
   }
