@@ -2,12 +2,17 @@ name: Daily AI News Digest
 
 on:
   schedule:
-    # UTC 04:00 = JST 13:00 (backup: cron-job.org による primary が失敗した場合のみ送信)
+    # UTC 04:00 = JST 13:00 (backup: cron-job.org による primary が届かなかった日だけ即時に送る)
+    # GitHub の schedule は実測で 2〜12 時間遅れるため、定時の配信には使わない
     - cron: '0 4 * * *'
   workflow_dispatch:
     inputs:
       immediate:
-        description: '即時送信（テスト用。通常は false にして UTC 00:00 = JST 09:00 まで待機）'
+        description: '即時送信（手動のテスト用。false は primary として UTC 00:00 = JST 09:00 まで待機）'
+        type: boolean
+        default: false
+      simulate_schedule:
+        description: 'schedule 起動（backup）と同じ分岐を通す（動作確認用）'
         type: boolean
         default: false
 
@@ -15,48 +20,33 @@ jobs:
   check:
     runs-on: ubuntu-latest
     outputs:
-      should_send: ${{ steps.dedup.outputs.should_send }}
+      kind: ${{ steps.decide.outputs.kind }}
+      should_send: ${{ steps.decide.outputs.should_send }}
+      send_at_utc: ${{ steps.decide.outputs.send_at_utc }}
     permissions:
       actions: read
+      contents: read
     steps:
-      - name: 本日送信済みか確認
-        id: dedup
-        run: |
-          # immediate=true の手動実行は重複チェックをスキップして即時送信
-          if [ "${{ inputs.immediate }}" = "true" ]; then
-            echo "should_send=true" >> $GITHUB_OUTPUT
-            echo "即時送信モードのため重複チェックをスキップします。"
-            exit 0
-          fi
-          # 直近 8 時間以内に成功済みか確認
-          # （cron-job.org による primary は UTC 23:45 起動, backup は UTC 04:00 起動のため日付跨ぎあり）
-          RECENT=$(gh run list \
-            --repo "$GITHUB_REPOSITORY" \
-            --workflow=daily-news.yml \
-            --status=success \
-            --limit=5 \
-            --json createdAt \
-            --jq '.[0].createdAt // ""')
-          if [ -n "$RECENT" ]; then
-            RECENT_EPOCH=$(date -d "$RECENT" +%s 2>/dev/null || echo 0)
-            NOW_EPOCH=$(date +%s)
-            DIFF=$((NOW_EPOCH - RECENT_EPOCH))
-            if [ "$DIFF" -lt 28800 ]; then
-              echo "should_send=false" >> $GITHUB_OUTPUT
-              echo "直近 8 時間以内に送信済みです (${DIFF}秒前)。スキップします。"
-              exit 0
-            fi
-          fi
-          echo "should_send=true" >> $GITHUB_OUTPUT
-          echo "送信済みの記録なし。メール送信を実行します。"
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: 配信の種類と送信の要否を決める
+        id: decide
+        run: bash .github/scripts/decide-delivery.sh
         env:
           GH_TOKEN: ${{ github.token }}
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_IMMEDIATE: ${{ inputs.immediate }}
+          INPUT_SIMULATE_SCHEDULE: ${{ inputs.simulate_schedule }}
 
   send-digest:
+    # ジョブ名に種類を載せる。backup の重複判定は "send-digest (primary)" の成功を探す
+    name: send-digest (${{ needs.check.outputs.kind }})
     needs: check
     if: needs.check.outputs.should_send == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # 待機の上限 SEND_MAX_WAIT_MINUTES（20 分）に取得・要約・送信の時間を足した長さ
+    timeout-minutes: 35
 
     steps:
       - name: Checkout
@@ -75,19 +65,6 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --ignore-scripts
 
-      - name: メール送信タイミング設定
-        run: |
-          # GitHub Actions 式で空文字列を返せないため、シェルで直接 GITHUB_ENV に書き込む
-          # immediate=true: SEND_AT_UTC を未設定（即時送信）
-          # それ以外: UTC 00:00 (JST 09:00) まで待機
-          if [ "${{ inputs.immediate }}" = "true" ]; then
-            echo "SEND_AT_UTC=" >> "$GITHUB_ENV"
-            echo "即時送信モード: SEND_AT_UTC を空に設定します。"
-          else
-            echo "SEND_AT_UTC=00:00" >> "$GITHUB_ENV"
-            echo "待機モード: UTC 00:00 (JST 09:00) まで待機します。"
-          fi
-
       - name: Send daily digest
         run: pnpm start
         env:
@@ -97,4 +74,7 @@ jobs:
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
           RECIPIENT_EMAIL: ${{ secrets.RECIPIENT_EMAIL }}
           NODE_ENV: production
-          # SEND_AT_UTC は前ステップで GITHUB_ENV に設定済み
+          # check ジョブの出力。空文字は「待たずに送る」。env.ts の zod が空を undefined にする
+          SEND_AT_UTC: ${{ needs.check.outputs.send_at_utc }}
+          SEND_MAX_WAIT_MINUTES: '20'
+          DELIVERY_KIND: ${{ needs.check.outputs.kind }}

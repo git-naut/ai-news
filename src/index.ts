@@ -9,6 +9,7 @@ import { analyzeTrends } from './ai/trend-analyzer.js';
 import { applyFallbackSummaries } from './ai/fallback.js';
 import { buildTemplateData, renderTemplate, formatJstDate } from './mail/template-engine.js';
 import { sendEmail } from './mail/sender.js';
+import { computeSendDelay } from './schedule/send-delay.js';
 import type { Article } from './feeds/types.js';
 import type { Trend } from './ai/trend-analyzer.js';
 
@@ -71,29 +72,18 @@ async function main(): Promise<void> {
 
   // SEND_AT_UTC が指定されている場合、その時刻まで待機してから送信する
   // （例: "00:00" → UTC 00:00 = JST 09:00 に送信）
-  // workflow_dispatch の場合は空文字列が渡されるため待機しない
-  const sendAtUtc = process.env.SEND_AT_UTC;
-  if (sendAtUtc) {
-    const parts = sendAtUtc.split(':').map(Number);
-    const targetHour = parts[0] ?? 0;
-    const targetMinute = parts[1] ?? 0;
-    const now = new Date();
-    const target = new Date(now);
-    target.setUTCHours(targetHour, targetMinute, 0, 0);
-    // 既に目標時刻を過ぎていた場合は翌日の同時刻
-    if (target.getTime() <= now.getTime()) {
-      target.setUTCDate(target.getUTCDate() + 1);
-    }
-    const sleepMs = target.getTime() - now.getTime();
-    if (sleepMs > 500) {
-      console.log(`[ai-news] UTC ${sendAtUtc} まで待機中 (${(sleepMs / 1000).toFixed(0)}秒)...`);
-      await new Promise((resolve) => setTimeout(resolve, sleepMs));
-    }
+  // 待ちが SEND_MAX_WAIT_MINUTES を超える場合は翌日へ繰り越さず即時に送る
+  const sleepMs = computeSendDelay(new Date(), env.SEND_AT_UTC, env.SEND_MAX_WAIT_MINUTES * 60 * 1000);
+  if (sleepMs > 0) {
+    console.log(`[ai-news] UTC ${env.SEND_AT_UTC} まで待機中 (${(sleepMs / 1000).toFixed(0)}秒)...`);
+    await new Promise((resolve) => setTimeout(resolve, sleepMs));
+  } else if (env.SEND_AT_UTC) {
+    console.warn(`[ai-news] UTC ${env.SEND_AT_UTC} までの待ちが上限 ${env.SEND_MAX_WAIT_MINUTES} 分を超えるため即時に送信します。`);
   }
 
   // Step 5: メール送信
   await sendEmail(
-    { html, text, totalCount: summarized.length, deliveryDate },
+    { html, text, totalCount: summarized.length, deliveryDate, deliveryKind: env.DELIVERY_KIND },
     {
       gmailUser: env.GMAIL_USER,
       gmailAppPassword: env.GMAIL_APP_PASSWORD,
