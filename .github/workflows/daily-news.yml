@@ -18,7 +18,7 @@ on:
 
 jobs:
   check:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     outputs:
       kind: ${{ steps.decide.outputs.kind }}
       should_send: ${{ steps.decide.outputs.should_send }}
@@ -28,7 +28,7 @@ jobs:
       contents: read
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: 配信の種類と送信の要否を決める
         id: decide
@@ -44,23 +44,21 @@ jobs:
     name: send-digest (${{ needs.check.outputs.kind }})
     needs: check
     if: needs.check.outputs.should_send == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # 待機の上限 SEND_MAX_WAIT_MINUTES（20 分）に取得・要約・送信の時間を足した長さ
     timeout-minutes: 35
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: '24'
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 10
+        uses: pnpm/action-setup@v6
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --ignore-scripts

@@ -314,3 +314,32 @@ UNIT はテストの合否と型だけを見る。コメントや説明文で赤
 .env では GMAIL_USER と RECIPIENT_EMAIL が同じ個人の @gmail.com になっている。
 2026-09-29 に「届いていない」と見えたのは、別の受信箱（会社の Workspace）を探していたため。
 配信の確認は宛先の受信箱で `in:anywhere subject:予備配信` のように探す。
+
+## ワークフローの版と実行環境
+
+<!-- L:WF-013 family=wf check=WF-7 mutation=m_wf_009 -->
+### 浮動タグ v4 は node20 のまま残っている
+
+actions/checkout と setup-node は v5 から、pnpm/action-setup は v6 から node24 で動く。
+pnpm/action-setup の v4.4.0 のリリースノートには「Node.js 24 へ更新」とある。それでも浮動タグ `v4` の
+action.yml は node20 のままだった（2026-09-29 に gh api で確認）。リリースノートでなく
+action.yml の `runs.using` を見て下限を決め、WF-7 に表として持たせた。
+
+<!-- L:WF-014 family=wf check=WF-8 mutation=m_wf_010 -->
+### ubuntu-latest は移行の時期を選ばせてくれない
+
+2026-10-19 から 11-19 にかけて ubuntu-latest が 26.04 に切り替わる（runner-images #14748）。
+全ジョブを ubuntu-24.04 に固定し、26.04 への移行は別の作業として自分で決める。WF-8 は
+runs-on が `ubuntu-XX.YY` の形であることを見る。
+
+<!-- L:WF-015 family=wf check=WF-9 mutation=m_wf_011 -->
+### pnpm の版は packageManager に一本化する
+
+pnpm/action-setup v6 は、with.version と package.json の packageManager が文字列で一致しないと
+失敗する。`version: 10` と `pnpm@10.34.5` でも落ちる。with.version を外し、packageManager に
+CI で解決されていた 10.34.5 を書いた。手元の pnpm 10.32.1 もこの指定を読んで 10.34.5 に切り替わった。
+
+<!-- L:WF-016 family=wf mutation=m_none_010 -->
+### ステップ名の言い換えで WF-7 と WF-9 が反応しないこと
+
+見るのは uses と with だけ。表示名は人のためのもの。
