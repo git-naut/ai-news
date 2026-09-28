@@ -68,6 +68,14 @@ cron-job.org の設定は次のとおりです。PAT は Fine-grained token（Ac
 | スケジュール | `45 23 * * *`（UTC）、POST |
 | Body | `{"ref":"main","inputs":{"immediate":"false"}}` |
 
+cron-job.org の既定の設定では、失敗してもメールは来ず、応答の本文も残りません。失敗が 25 回を超えるとジョブは自動で止まり、履歴はジョブごとに直近 50 件だけ残ります。次の 3 つを必ず見直します。
+
+| 設定 | 値 | 理由 |
+|---|---|---|
+| Notifications の「execution of the cronjob fails」と「the cronjob will be disabled because of too many failures」 | オン | 既定はどちらもオフ。3 か月気づけなかった原因の一つ |
+| Save responses in job history | オン | オフだと GitHub の 401 の本文が残らず、原因を切り分けられない |
+| Schedule expires | 期限なし | 期限を過ぎると失敗扱いにならず、黙って予定から外れる |
+
 ## 開発と検査
 
 ```bash
