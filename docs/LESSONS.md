@@ -274,3 +274,43 @@ gaps.json を置き、LOOP-2 が反応しないことを確かめる。
 待ちは 24 時間になり、上限（最大 60 分）を超えるので結果は 0 のまま。どの入力でも
 挙動が同じ等価変異なので、手作業の逆テストで escaped と出ても検査は足さなかった。
 等価かどうかは、上限が 24 時間未満であることに依存する。上限の範囲を広げるときは見直す。
+
+## テストと型
+
+<!-- L:UNIT-001 family=unit check=UNIT-1 mutation=m_unit_001 -->
+### 待機の上限は、テストが落ちることで守る
+
+`computeSendDelay` の上限を外すと、3 か月の欠配と同じ形に戻る。unit 系統は vitest を JSON で
+走らせ、落ちたテスト1件を不合格1件として返す。終了コードではなく件数を返すので、
+逆テストの増分判定がそのまま効く。1 回 35 秒前後かかるため slow 系統にした。
+
+<!-- L:UNIT-002 family=unit check=UNIT-1 mutation=m_unit_002 -->
+### 重複判定は、送信ジョブの結論まで見る
+
+cancelled や skipped の primary を送信済みに数えると、欠配の日に予備が出ない。
+判定スクリプトは偽の gh を PATH に置いたテストで分岐ごとに走らせている。
+
+<!-- L:UNIT-003 family=unit check=UNIT-1 mutation=m_unit_003 -->
+### 予備配信の印は件名のテストで守る
+
+印が消えると、primary が届かなかった日を受信箱で見分けられない。
+2026-09-29 の予備配信は、宛先の個人 Gmail に届いていた。
+
+<!-- L:UNIT-004 family=unit check=UNIT-2 mutation=m_unit_004 -->
+### tests/ の型は誰も検査していなかった
+
+ルートの tsconfig.json は `include: ["src/**/*.ts"]` で、tests/ を除外していた。
+tests/tsconfig.json を作って typecheck と unit 系統の両方にかけた。初回の型エラーは 0 件だった。
+0 件が素通りでないことは `--listFilesOnly` で確かめた（src 19 本、tests 11 本）。
+
+<!-- L:UNIT-005 family=unit mutation=m_none_009 -->
+### コメントの言い換えで unit が反応しないこと
+
+UNIT はテストの合否と型だけを見る。コメントや説明文で赤くなるなら、テストが文面に依存している。
+
+<!-- L:OPS-003 family=ops -->
+### 宛先は送信元と同じ個人の Gmail
+
+.env では GMAIL_USER と RECIPIENT_EMAIL が同じ個人の @gmail.com になっている。
+2026-09-29 に「届いていない」と見えたのは、別の受信箱（会社の Workspace）を探していたため。
+配信の確認は宛先の受信箱で `in:anywhere subject:予備配信` のように探す。
