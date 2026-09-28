@@ -2,6 +2,7 @@ import axios from 'axios';
 import { stripHtml } from '../feeds/normalizer.js';
 import { NewsdataResponseSchema } from './types.js';
 import type { RawArticle } from '../feeds/types.js';
+import { isWithinLookback } from '../config/lookback.js';
 
 const NEWSDATA_API_BASE = 'https://newsdata.io/api/1/news';
 
@@ -46,9 +47,8 @@ export async function fetchNewsApi(apiKey: string): Promise<RawArticle[]> {
         const publishedAt = dateStr ? new Date(dateStr) : new Date();
         if (isNaN(publishedAt.getTime())) continue;
 
-        // 24時間以内の記事のみ追加
-        const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
-        if (publishedAt < cutoff) continue;
+        // 取得窓（RSS と共有の LOOKBACK_HOURS）以内の記事のみ追加
+        if (!isWithinLookback(publishedAt, new Date())) continue;
 
         articles.push({
           title: item.title,
