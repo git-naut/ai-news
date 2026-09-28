@@ -16,10 +16,35 @@ function makeArticle(override: Partial<RawArticle> = {}): RawArticle {
 }
 
 describe('normalizeUrl', () => {
-  it('クエリパラメータを除去する', () => {
+  it('追跡用のクエリパラメータを除去する', () => {
     expect(normalizeUrl('https://example.com/article?utm_source=twitter')).toBe(
       'https://example.com/article'
     );
+    expect(
+      normalizeUrl('https://example.com/a?utm_medium=x&fbclid=1&gclid=2&mc_cid=3&mc_eid=4&ref=hn&ref_src=twsrc')
+    ).toBe('https://example.com/a');
+  });
+
+  it('記事を識別するクエリパラメータは残す', () => {
+    expect(normalizeUrl('https://news.ycombinator.com/item?id=1')).not.toBe(
+      normalizeUrl('https://news.ycombinator.com/item?id=2')
+    );
+    expect(normalizeUrl('https://www.youtube.com/watch?v=a')).not.toBe(
+      normalizeUrl('https://www.youtube.com/watch?v=b')
+    );
+    expect(normalizeUrl('https://news.ycombinator.com/item?id=1&utm_source=x')).toBe(
+      'https://news.ycombinator.com/item?id=1'
+    );
+  });
+
+  it('残したクエリパラメータはキー順に並べる', () => {
+    expect(normalizeUrl('https://example.com/p?b=2&a=1')).toBe(normalizeUrl('https://example.com/p?a=1&b=2'));
+    expect(normalizeUrl('https://example.com/p?b=2&a=1')).toBe('https://example.com/p?a=1&b=2');
+  });
+
+  it('スキームとホストだけ小文字にし、パスの大小は保つ', () => {
+    expect(normalizeUrl('HTTPS://Example.COM/Foo/Bar')).toBe('https://example.com/Foo/Bar');
+    expect(normalizeUrl('https://example.com/Foo')).not.toBe(normalizeUrl('https://example.com/foo'));
   });
 
   it('フラグメントを除去する', () => {
@@ -83,6 +108,15 @@ describe('deduplicate', () => {
     ];
     const result = deduplicate(articles);
     expect(result).toHaveLength(1);
+  });
+
+  it('クエリだけが違う別記事は両方残す', () => {
+    const articles = [
+      makeArticle({ url: 'https://news.ycombinator.com/item?id=1', title: 'Show HN: A tiny database' }),
+      makeArticle({ url: 'https://news.ycombinator.com/item?id=2', title: 'Ask HN: How do you plan your week' }),
+    ];
+    const result = deduplicate(articles);
+    expect(result).toHaveLength(2);
   });
 
   it('異なる記事は両方残す', () => {
