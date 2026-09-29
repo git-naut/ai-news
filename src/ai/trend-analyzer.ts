@@ -12,6 +12,26 @@ export interface Trend {
   action?: string;
 }
 
+/**
+ * トレンドの各欄の上限（文字数）。2026-09-29 の見本では、トレンドの欄だけでスマホの画面が約 1,200px あり、
+ * 記事が下に押しやられた。プロンプトで指示し、超えた分は受け取った側で切る。
+ */
+export const TREND_LIMITS = { trend: 20, description: 80, action: 50 } as const;
+
+/** 載せるトレンドの最大件数 */
+export const TREND_MAX = 4;
+
+/**
+ * 文字列を上限の長さに収める。超えるときは上限の 1 文字手前で切って「…」を付ける。
+ * @param s 文字列
+ * @param max 上限（文字数）
+ */
+function clamp(s: string, max: number): { text: string; cut: boolean } {
+  const chars = [...s];
+  if (chars.length <= max) return { text: s, cut: false };
+  return { text: `${chars.slice(0, max - 1).join('')}…`, cut: true };
+}
+
 /** トレンドの応答スキーマ（検証用） */
 const trendSchema = z.object({
   trends: z.array(
@@ -32,9 +52,9 @@ const trendJsonSchema = {
       items: {
         type: 'object',
         properties: {
-          trend: { type: 'string', description: 'トレンドのタイトル（20文字以内）' },
-          description: { type: 'string', description: '1〜2文の技術的説明' },
-          action: { type: 'string', description: '試すための具体的アクション（リポジトリ名・ツール名・API名など）' },
+          trend: { type: 'string', description: `トレンドのタイトル（${TREND_LIMITS.trend} 文字以内）` },
+          description: { type: 'string', description: `技術的な説明（${TREND_LIMITS.description} 文字以内の 1 文）` },
+          action: { type: 'string', description: `試すための具体的アクション（${TREND_LIMITS.action} 文字以内。リポジトリ名・ツール名・API名など）` },
         },
         required: ['trend', 'description'],
       },
@@ -59,8 +79,9 @@ export async function analyzeTrends(
     .join('\n');
 
   const prompt = `以下は本日の AI/テック ニュース ${Math.min(articles.length, 50)} 件のタイトルと要約です。
-これらを分析し、エンジニアが「今週押さえておくべき技術トレンド」を3〜5個、日本語で説明してください。
+これらを分析し、エンジニアが「今週押さえておくべき技術トレンド」を3〜4個、日本語で説明してください。
 観察の羅列ではなく、何を試せるか・何に備えるべきかを重視してください。
+trend は ${TREND_LIMITS.trend} 文字以内、description は ${TREND_LIMITS.description} 文字以内の 1 文、action は ${TREND_LIMITS.action} 文字以内で書いてください。
 action は情報がなければ省略してください。
 
 ニュース一覧:
@@ -68,7 +89,20 @@ ${articleSummaries}`;
 
   try {
     const parsed = await generateJson(llm, { prompt, schema: trendSchema, jsonSchema: trendJsonSchema, schemaName: 'trends' });
-    return parsed.trends.map((t) => (t.action ? { trend: t.trend, description: t.description, action: t.action } : { trend: t.trend, description: t.description }));
+    let cutCount = 0;
+    const trends = parsed.trends.slice(0, TREND_MAX).map((t): Trend => {
+      const trend = clamp(t.trend, TREND_LIMITS.trend);
+      const description = clamp(t.description, TREND_LIMITS.description);
+      const action = t.action ? clamp(t.action, TREND_LIMITS.action) : null;
+      cutCount += [trend, description, action].filter((x) => x?.cut === true).length;
+      return action
+        ? { trend: trend.text, description: description.text, action: action.text }
+        : { trend: trend.text, description: description.text };
+    });
+    if (cutCount > 0 || parsed.trends.length > TREND_MAX) {
+      console.warn(`[ai] トレンドを上限に合わせて切りました（欄 ${cutCount} 件、件数 ${parsed.trends.length} → ${trends.length}）`);
+    }
+    return trends;
   } catch (error) {
     console.warn('[ai] トレンド分析に失敗:', error instanceof Error ? error.message : String(error));
     return [];
