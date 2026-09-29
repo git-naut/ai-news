@@ -26,17 +26,18 @@ export const RSS_FEEDS: FeedSource[] = [
     maxItems: 5,
   },
   {
-    // Claude Opus 4.6, Claude Sonnet 4.6, Claude Haiku 4.5
+    // Anthropic は公式の RSS を出していない。Olshansk/rss-feeds が anthropic.com/news を巡回して作る第三者のフィード。
+    // 2026-09-29 まで使っていた conoro 版は 2025-11-24 で更新が止まり、10 か月気づかなかった
     name: 'Anthropic Blog',
-    url: 'https://raw.githubusercontent.com/conoro/anthropic-engineering-rss-feed/main/anthropic_engineering_rss.xml',
+    url: 'https://raw.githubusercontent.com/Olshansk/rss-feeds/main/feeds/feed_anthropic_news.xml',
     category: 'AI/LLM',
     language: 'en',
     maxItems: 5,
   },
   {
-    // Gemini 3.1 Pro, Gemini 3.1 Flash
+    // deepmind.google 自身の RSS。blog.google 側のフィードは 2026-09-09 から記事が増えていなかった（09-29 の実測）
     name: 'Google DeepMind',
-    url: 'https://blog.google/technology/google-deepmind/rss/',
+    url: 'https://deepmind.google/blog/rss.xml',
     category: 'AI/LLM',
     language: 'en',
     maxItems: 5,
@@ -79,6 +80,22 @@ export const RSS_FEEDS: FeedSource[] = [
     name: 'Qiita 人気記事',
     url: 'https://qiita.com/popular-items/feed.atom',
     category: 'Development',
+    language: 'ja',
+    maxItems: 5,
+  },
+  // @IT と ITmedia AI+ は同じ記事を両方に載せることがある（09-29 の実測で数件）。
+  // 重複は deduplicate（URL とタイトルの類似度）が1件に絞る
+  {
+    name: '@IT',
+    url: 'https://rss.itmedia.co.jp/rss/2.0/ait.xml',
+    category: 'Development',
+    language: 'ja',
+    maxItems: 5,
+  },
+  {
+    name: 'ITmedia AI+',
+    url: 'https://rss.itmedia.co.jp/rss/2.0/aiplus.xml',
+    category: 'AI/LLM',
     language: 'ja',
     maxItems: 5,
   },
