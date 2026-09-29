@@ -16,7 +16,15 @@ AI News Digest
 {{#each articles}}
 
 ■ {{title}}
-  {{summary}}
+{{#if summary}}
+  何が: {{summary.what}}
+  差分: {{summary.change}}
+{{#if summary.tryIt}}
+  試す: {{summary.tryIt}}
+{{/if}}
+{{else}}
+  {{excerpt}}
+{{/if}}
   → {{url}}{{#if githubUrl}}
   [GitHub] {{githubUrl}}{{/if}}
   [{{sourceName}} / {{publishedAt}}]

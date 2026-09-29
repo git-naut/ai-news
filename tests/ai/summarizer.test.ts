@@ -37,19 +37,19 @@ describe('batchSummarize', () => {
   });
 
   it('要約を記事に設定する', async () => {
-    vi.mocked(generateJson).mockResolvedValue({ items: [{ id: 'a1', summary: 'GPT-5 が公開された。' }] });
+    vi.mocked(generateJson).mockResolvedValue({ items: [{ id: 'a1', what: 'GPT-5 が公開された。', change: 'SWE-bench で 74.9%。', tryIt: 'API の gpt-5' }] });
     const result = await batchSummarize(llm, [article('a1')], { sleep: noSleep });
-    expect(result[0]?.summary).toBe('GPT-5 が公開された。');
+    expect(result[0]?.summary).toEqual({ what: 'GPT-5 が公開された。', change: 'SWE-bench で 74.9%。', tryIt: 'API の gpt-5' });
   });
 
   it('1 バッチが失敗しても、他のバッチの要約は残る', async () => {
     const articles = Array.from({ length: 10 }, (_, i) => article(`id${i}`));
     vi.mocked(generateJson)
-      .mockResolvedValueOnce({ items: articles.slice(0, 5).map((a) => ({ id: a.id, summary: `要約 ${a.id}` })) })
+      .mockResolvedValueOnce({ items: articles.slice(0, 5).map((a) => ({ id: a.id, what: `要約 ${a.id}`, change: '差分', tryIt: '' })) })
       .mockRejectedValueOnce(new Error('API Error'));
 
     const result = await batchSummarize(llm, articles, { sleep: noSleep });
-    expect(result.slice(0, 5).every((a) => a.summary?.startsWith('要約 '))).toBe(true);
+    expect(result.slice(0, 5).every((a) => a.summary?.what.startsWith('要約 '))).toBe(true);
     expect(result.slice(5).every((a) => a.summary === null)).toBe(true);
   });
 
@@ -79,8 +79,21 @@ describe('batchSummarize', () => {
   });
 
   it('応答に無い ID の要約は捨てる', async () => {
-    vi.mocked(generateJson).mockResolvedValue({ items: [{ id: 'other', summary: '別の記事' }] });
+    vi.mocked(generateJson).mockResolvedValue({ items: [{ id: 'other', what: '別の記事', change: '差分', tryIt: '' }] });
     const result = await batchSummarize(llm, [article('a1')], { sleep: noSleep });
     expect(result[0]?.summary).toBeNull();
+  });
+
+  it('tryIt が空文字なら null にする（試せるものが無い記事）', async () => {
+    vi.mocked(generateJson).mockResolvedValue({ items: [{ id: 'a1', what: '何が', change: '差分', tryIt: ' ' }] });
+    const result = await batchSummarize(llm, [article('a1')], { sleep: noSleep });
+    expect(result[0]?.summary?.tryIt).toBeNull();
+  });
+
+  it('プロンプトで誇張の語を禁じ、3 欄の意味を指示する', async () => {
+    vi.mocked(generateJson).mockResolvedValue({ items: [] });
+    await batchSummarize(llm, [article('a1')], { sleep: noSleep });
+    const prompt = vi.mocked(generateJson).mock.calls[0]?.[1].prompt ?? '';
+    for (const word of ['what', 'change', 'tryIt', '大幅', '革命的']) expect(prompt).toContain(word);
   });
 });

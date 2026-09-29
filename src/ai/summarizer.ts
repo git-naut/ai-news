@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { generateJson, type LlmConfig } from './client.js';
-import type { Article } from '../feeds/types.js';
+import { findSummaryIssues, HYPE_WORDS, SUMMARY_FIELD_MAX } from './summary-lint.js';
+import type { Article, DigestSummary } from '../feeds/types.js';
 
 /** 1回の LLM 呼び出しで処理する記事数 */
 const BATCH_SIZE = 5;
@@ -16,7 +17,9 @@ const REQUEST_INTERVAL_MS = 6000;
 const CONTENT_EXCERPT_LENGTH = 500;
 
 /** 要約の応答スキーマ（検証用） */
-const summarySchema = z.object({ items: z.array(z.object({ id: z.string(), summary: z.string().min(1) })) });
+const summarySchema = z.object({
+  items: z.array(z.object({ id: z.string(), what: z.string().min(1), change: z.string().min(1), tryIt: z.string() })),
+});
 
 /** 要約の応答スキーマ（構造化出力として API に渡す） */
 const summaryJsonSchema = {
@@ -28,9 +31,11 @@ const summaryJsonSchema = {
         type: 'object',
         properties: {
           id: { type: 'string', description: '記事ID' },
-          summary: { type: 'string', description: '日本語で2〜3文の要約' },
+          what: { type: 'string', description: '何が出たか・何が起きたか（日本語1文）' },
+          change: { type: 'string', description: '従来との差。数字があれば数字で（日本語1文）' },
+          tryIt: { type: 'string', description: '試せるリポジトリ・API・ツール名。無ければ空文字' },
         },
-        required: ['id', 'summary'],
+        required: ['id', 'what', 'change', 'tryIt'],
       },
     },
   },
@@ -54,7 +59,7 @@ function sleep(ms: number): Promise<void> {
 async function summarizeBatch(
   llm: LlmConfig,
   articles: Article[]
-): Promise<Map<string, string>> {
+): Promise<Map<string, DigestSummary>> {
   const articleList = articles
     .map((a, i) => {
       const excerpt = a.content?.slice(0, CONTENT_EXCERPT_LENGTH) ?? '（本文なし）';
@@ -63,14 +68,15 @@ async function summarizeBatch(
     .join('\n\n');
 
   const prompt = `あなたはAI/テック専門のエンジニア向けキュレーターです。
-以下の ${articles.length} 件の記事について、シニアエンジニアが読んで価値を感じるよう、
-それぞれ日本語で2〜3文の要約を作成してください。
+以下の ${articles.length} 件の記事を、シニアエンジニアが朝に読む前提で、各記事 3 欄の日本語で要約してください。
 
-要約に含めるべき優先事項（情報がある場合は必ず含める）:
-1. 何が変わったか・何が新しいか（従来との差分・変化点）
-2. 実装・試用できるか（GitHub リポジトリ名 / API / ライブラリ名）
-3. 具体的な数値・ベンチマーク・パラメータ数
+- what: 何が出たか・何が起きたか。主語と固有名詞を入れた 1 文。
+- change: 従来との差。ベンチマーク・パラメータ数・価格・版などの数字が記事にあれば数字で書く。無ければ何が変わったかを 1 文で。
+- tryIt: 読者が試せるリポジトリ名・API 名・ツール名。記事に無ければ空文字。推測で作らない。
 
+各欄は ${SUMMARY_FIELD_MAX} 文字以内。である調で書く。
+次の誇張の語は使わず、数字か事実に置き換える: ${HYPE_WORDS.join('、')}。
+記事に書かれていないことは書かない。
 各要素の id には、記事リストの id をそのまま使ってください。
 
 記事リスト:
@@ -79,9 +85,11 @@ ${articleList}`;
   const parsed = await generateJson(llm, { prompt, schema: summarySchema, jsonSchema: summaryJsonSchema, schemaName: 'summaries' });
 
   const wanted = new Set(articles.map((a) => a.id));
-  const summaryMap = new Map<string, string>();
+  const summaryMap = new Map<string, DigestSummary>();
   for (const item of parsed.items) {
-    if (wanted.has(item.id)) summaryMap.set(item.id, item.summary);
+    if (!wanted.has(item.id)) continue;
+    const tryIt = item.tryIt.trim();
+    summaryMap.set(item.id, { what: item.what.trim(), change: item.change.trim(), tryIt: tryIt === '' ? null : tryIt });
   }
   return summaryMap;
 }
@@ -100,7 +108,7 @@ export async function batchSummarize(
   deps: SummarizeDeps = {}
 ): Promise<Article[]> {
   const wait = deps.sleep ?? sleep;
-  const mergedMap = new Map<string, string>();
+  const mergedMap = new Map<string, DigestSummary>();
   let failedBatches = 0;
   let batchCount = 0;
 
@@ -119,6 +127,12 @@ export async function batchSummarize(
         error instanceof Error ? error.message : String(error)
       );
     }
+  }
+
+  // 誇張の語・長すぎる欄・空の欄を数えて出す。止めずに監視に使う
+  const issues = [...mergedMap.values()].flatMap((s) => findSummaryIssues(s));
+  if (issues.length > 0) {
+    console.warn(`[ai] 要約の指摘 ${issues.length} 件（先頭 5 件）:`, issues.slice(0, 5).join(' / '));
   }
 
   if (failedBatches > 0) {

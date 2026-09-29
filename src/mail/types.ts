@@ -1,19 +1,17 @@
 import type { Trend } from '../ai/trend-analyzer.js';
+import type { DigestSummary } from '../feeds/types.js';
 
 /** テンプレートに渡す1記事分のデータ */
 export interface ArticleTemplateData {
   title: string;
   url: string;
   sourceName: string;
-  summary: string;
+  /** 3 行の要約。LLM が失敗した記事は null */
+  summary: DigestSummary | null;
+  /** 要約が無い記事に出す本文の抜粋。要約がある記事は null */
+  excerpt: string | null;
   publishedAt: string; // フォーマット済み文字列
   githubUrl: string | null; // 本文中に GitHub リンクがある場合のみ設定
-}
-
-/** 2カラムレイアウト用の記事ペア */
-export interface ArticlePair {
-  left: ArticleTemplateData;
-  right: ArticleTemplateData | null; // 奇数件数の末尾はnull
 }
 
 /** テンプレートに渡すカテゴリセクションのデータ */
@@ -21,8 +19,7 @@ export interface CategorySection {
   name: string;
   /** 見出しの記号（Gmail が Web フォントを読まないので Unicode 記号を使う。例 ◇） */
   icon: string;
-  articles: ArticleTemplateData[];     // テキストテンプレート用
-  articlePairs: ArticlePair[];         // 2カラムHTMLテンプレート用
+  articles: ArticleTemplateData[];
 }
 
 /** Handlebars テンプレートに渡すデータ全体 */

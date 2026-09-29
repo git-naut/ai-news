@@ -55,7 +55,7 @@ export async function analyzeTrends(
 
   const articleSummaries = articles
     .slice(0, 50) // コンテキスト長を抑えるため上位50件のみ使用
-    .map((a) => `・${a.title}${a.summary ? `\n  → ${a.summary}` : ''}`)
+    .map((a) => `・${a.title}${a.summary ? `\n  → ${a.summary.what} ${a.summary.change}` : ''}`)
     .join('\n');
 
   const prompt = `以下は本日の AI/テック ニュース ${Math.min(articles.length, 50)} 件のタイトルと要約です。

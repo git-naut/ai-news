@@ -17,14 +17,14 @@ export function generateFallbackSummary(article: RawArticle): string | null {
 }
 
 /**
- * Gemini API が完全に利用不可の場合に、全記事にフォールバック要約を適用する。
- * カテゴリは各記事の既存の category フィールドを使用する。
+ * LLM が完全に利用不可の場合に、全記事を要約なし（summary: null）の Article にする。
+ * メールは要約の代わりに本文の抜粋（generateFallbackSummary）を出す。
  */
 export function applyFallbackSummaries(
   articles: (RawArticle & { id: string; category: Category })[]
 ): Article[] {
   return articles.map((article) => ({
     ...article,
-    summary: generateFallbackSummary(article),
+    summary: null,
   }));
 }

@@ -5,7 +5,8 @@ import { dirname, join } from 'node:path';
 import { format } from 'date-fns';
 import { toZonedTime } from 'date-fns-tz';
 import { ja } from 'date-fns/locale';
-import type { DigestTemplateData, ArticlePair, ArticleTemplateData } from './types.js';
+import type { DigestTemplateData, ArticleTemplateData } from './types.js';
+import { generateFallbackSummary } from '../ai/fallback.js';
 import type { Article } from '../feeds/types.js';
 import type { Trend } from '../ai/trend-analyzer.js';
 import type { Category } from '../config/categories.js';
@@ -70,15 +71,6 @@ function extractGithubUrl(content: string | null): string | null {
   return match?.[0] ?? null;
 }
 
-/** 記事配列を2件ずつのペアに分割する（2カラムレイアウト用） */
-function pairArticles(articles: ArticleTemplateData[]): ArticlePair[] {
-  const pairs: ArticlePair[] = [];
-  for (let i = 0; i < articles.length; i += 2) {
-    pairs.push({ left: articles[i]!, right: articles[i + 1] ?? null });
-  }
-  return pairs;
-}
-
 /**
  * Article の配列と Trend 配列から DigestTemplateData を構築する。
  */
@@ -100,17 +92,16 @@ export function buildTemplateData(
     .map((cat) => ({
       name: cat,
       icon: CATEGORY_ICONS[cat],
-      ...((): { articles: ArticleTemplateData[]; articlePairs: ArticlePair[] } => {
-        const articles = (grouped.get(cat) ?? []).map((a): ArticleTemplateData => ({
-          title: a.title,
-          url: a.url,
-          sourceName: a.sourceName,
-          summary: a.summary ?? a.content?.slice(0, 150) ?? '（要約なし）',
-          publishedAt: format(toZonedTime(a.publishedAt, 'Asia/Tokyo'), 'MM/dd HH:mm'),
-          githubUrl: extractGithubUrl(a.content),
-        }));
-        return { articles, articlePairs: pairArticles(articles) };
-      })(),
+      articles: (grouped.get(cat) ?? []).map((a): ArticleTemplateData => ({
+        title: a.title,
+        url: a.url,
+        sourceName: a.sourceName,
+        summary: a.summary,
+        // 要約が無い記事だけ本文の抜粋を出す（LLM が失敗したバッチの記事）
+        excerpt: a.summary ? null : generateFallbackSummary(a) ?? '（要約なし）',
+        publishedAt: format(toZonedTime(a.publishedAt, 'Asia/Tokyo'), 'MM/dd HH:mm'),
+        githubUrl: extractGithubUrl(a.content),
+      })),
     }));
 
   return {
