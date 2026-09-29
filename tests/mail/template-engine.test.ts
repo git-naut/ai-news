@@ -175,3 +175,37 @@ describe('formatJstDate', () => {
     expect(formatJstDate(new Date('2026-03-23T00:00:00Z'))).toBe('2026年03月23日 09:00 JST');
   });
 });
+
+describe('取得元の状態', () => {
+  const health = {
+    stale: [
+      { name: 'Anthropic Blog', newest: new Date('2025-11-24T00:00:00Z') },
+      { name: 'Empty Feed', newest: null },
+    ],
+    failed: ['Hugging Face Blog'],
+  };
+
+  it('止まった取得元と失敗した取得元を、名前と最終更新日つきの行にする', () => {
+    const data = buildTemplateData(mockArticles, [], DATE, health);
+    expect(data.sourceNotes).toEqual([
+      'Anthropic Blog は 2025年11月24日 から更新がありません',
+      'Empty Feed は記事がありません',
+      'Hugging Face Blog は取得に失敗しました',
+    ]);
+  });
+
+  it('テキストと HTML の両方のフッターに出す', () => {
+    const data = buildTemplateData(mockArticles, [], DATE, health);
+    for (const name of ['digest-text', 'digest']) {
+      const out = renderTemplate(name, data);
+      expect(out).toContain('取得元の状態');
+      expect(out).toContain('Anthropic Blog は 2025年11月24日 から更新がありません');
+    }
+  });
+
+  it('問題の無い日はフッターに何も出さない', () => {
+    const data = buildTemplateData(mockArticles, [], DATE);
+    expect(data.sourceNotes).toEqual([]);
+    for (const name of ['digest-text', 'digest']) expect(renderTemplate(name, data)).not.toContain('取得元の状態');
+  });
+});

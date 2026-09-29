@@ -34,6 +34,8 @@ export interface DigestTemplateData {
   trends: Trend[];
   /** トレンドセクションを表示するかどうか */
   hasTrends: boolean;
+  /** 更新が止まった・取得に失敗した取得元の説明。問題が無ければ空 */
+  sourceNotes: string[];
 }
 
 /**

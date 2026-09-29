@@ -71,13 +71,35 @@ function extractGithubUrl(content: string | null): string | null {
   return match?.[0] ?? null;
 }
 
+/** 取得元の状態。fetchAllFeedsWithReport の stale と failed */
+export interface SourceHealth {
+  stale: { name: string; newest: Date | null }[];
+  failed: string[];
+}
+
+/**
+ * 取得元の状態をメールのフッターに出す行にする。
+ * Anthropic の第三者フィードは 10 か月止まっていて、誰も気づかなかった。受信箱で気づけるようにする。
+ * @param health 取得元の状態
+ */
+function describeSourceHealth(health: SourceHealth): string[] {
+  const lines = health.stale.map((s) =>
+    s.newest
+      ? `${s.name} は ${format(toZonedTime(s.newest, 'Asia/Tokyo'), 'yyyy年MM月dd日', { locale: ja })} から更新がありません`
+      : `${s.name} は記事がありません`
+  );
+  return [...lines, ...health.failed.map((name) => `${name} は取得に失敗しました`)];
+}
+
 /**
  * Article の配列と Trend 配列から DigestTemplateData を構築する。
+ * @param health 取得元の状態。省略すると問題なしとして扱う
  */
 export function buildTemplateData(
   articles: Article[],
   trends: Trend[],
-  deliveryDate: string
+  deliveryDate: string,
+  health: SourceHealth = { stale: [], failed: [] }
 ): DigestTemplateData {
   // カテゴリ別にグループ化
   const grouped = new Map<Category, Article[]>();
@@ -110,6 +132,7 @@ export function buildTemplateData(
     categories,
     trends,
     hasTrends: trends.length > 0,
+    sourceNotes: describeSourceHealth(health),
   };
 }
 

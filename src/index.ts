@@ -105,7 +105,7 @@ async function main(): Promise<void> {
   // Step 4: メール生成
   // 配信時刻は起動時刻ではなく送信予定時刻（now + 待ち）で描く
   const deliveryDate = formatJstDate(plannedSendTime(now, sleepMs));
-  const templateData = buildTemplateData(summarized, trends, deliveryDate);
+  const templateData = buildTemplateData(summarized, trends, deliveryDate, sourceHealth);
   const html = renderTemplate('digest', templateData);
   const text = renderTemplate('digest-text', templateData);
 

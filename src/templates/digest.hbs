@@ -82,6 +82,13 @@
           <!-- フッター -->
           <tr>
             <td style="background-color:#f0f0f0;padding:20px 24px;border-radius:0 0 8px 8px;border:1px solid #e0e0e0;border-top:none;">
+              {{#if sourceNotes.length}}
+              <p style="margin:0 0 6px;font-size:12px;color:#b06000;font-weight:600;">取得元の状態</p>
+              {{#each sourceNotes}}
+              <p style="margin:0 0 3px;font-size:12px;color:#b06000;">・{{this}}</p>
+              {{/each}}
+              <p style="margin:0 0 10px;"></p>
+              {{/if}}
               <p style="margin:0;font-size:12px;color:#888;text-align:center;">このメールは GitHub Actions によって自動送信されています。</p>
             </td>
           </tr>
