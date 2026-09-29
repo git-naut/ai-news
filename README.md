@@ -1,6 +1,6 @@
 # ai-news
 
-毎朝 JST 09:00 に、AI とソフトウェア開発のニュースを日本語の要約つきで Gmail に届けるシステムです。RSS 8 本、Hacker News の検索 5 本、NewsData.io の 3 クエリから直近 36 時間の記事を集めます。要約とトレンドは BytePlus ModelArk の LLM がまとめます。起動は GitHub Actions です。
+毎朝 JST 09:00 に、AI とソフトウェア開発のニュースを日本語の要約つきで Gmail に届けるシステムです。RSS 10 本、Hacker News の検索 5 本、NewsData.io の 3 クエリから直近 36 時間の記事を集めます。要約とトレンドは BytePlus ModelArk の LLM がまとめます。起動は GitHub Actions です。
 
 ## 届くまでの流れ
 
@@ -19,7 +19,7 @@ GitHub の schedule（UTC 04:00）が backup です。前夜の primary の送�
 
 | 種類 | 取得元 | 取り方 |
 |---|---|---|
-| RSS（8 本） | OpenAI Blog、Anthropic Blog、Google DeepMind、Microsoft Research、Hugging Face Blog、Publickey、Zenn トレンド、Qiita 人気記事 | `src/config/feeds.ts` |
+| RSS（10 本） | OpenAI Blog、Anthropic Blog、Google DeepMind、Microsoft Research、Hugging Face Blog、Publickey、Zenn トレンド、Qiita 人気記事、@IT、ITmedia AI+ | `src/config/feeds.ts`。Anthropic は公式の RSS が無く、第三者（Olshansk/rss-feeds）のフィードを読む |
 | Hacker News（5 本） | LLM、Llama、DeepSeek、Mistral、Grok をタイトルで検索 | 公式の Algolia API。`src/hn/client.ts` |
 | NewsData.io（3 クエリ） | AI と LLM の英語・日本語ニュース | `src/news-api/client.ts` |
 

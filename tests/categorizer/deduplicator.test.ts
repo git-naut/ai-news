@@ -95,6 +95,18 @@ describe('deduplicate', () => {
     expect(result[0]?.content).toBe('Much longer content here');
   });
 
+  it('@IT と ITmedia AI+ に同じ記事が載ったら、取得元が違っても URL で1件に絞る', () => {
+    // 2026-09-29 の実測で、両フィードの 20 件中 4 件ほどが同じ記事だった
+    const url = 'https://www.itmedia.co.jp/aiplus/articles/2609/29/news001.html';
+    const articles = [
+      makeArticle({ url, title: '生成AIの新モデルを発表', sourceName: '@IT', language: 'ja', content: '短い' }),
+      makeArticle({ url, title: '新モデル発表、その狙いは', sourceName: 'ITmedia AI+', language: 'ja', content: 'こちらの方が長い本文' }),
+    ];
+    const result = deduplicate(articles);
+    expect(result).toHaveLength(1);
+    expect(result[0]?.sourceName).toBe('ITmedia AI+');
+  });
+
   it('タイトルが類似した記事は重複とみなす', () => {
     const articles = [
       makeArticle({
