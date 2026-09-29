@@ -60,13 +60,25 @@ vi.mock('rss-parser', () => {
             ],
           });
         }
+        // 中身が0件のフィード
+        if (url.includes('empty')) {
+          return Promise.resolve({ items: [] });
+        }
+        // age-<N>d: N 日前の記事が1件だけのフィード（鮮度の判定用）
+        const age = /age-(\d+)d/.exec(url);
+        if (age) {
+          const days = Number(age[1]);
+          return Promise.resolve({
+            items: [{ title: `Post ${days} Days Ago`, link: `https://example.com/age-${days}`, isoDate: new Date(now - days * 24 * 60 * 60 * 1000).toISOString() }],
+          });
+        }
         return Promise.resolve({ items });
       }),
     })),
   };
 });
 
-import { fetchAllFeeds } from '../../src/feeds/fetcher.js';
+import { fetchAllFeeds, fetchAllFeedsWithReport, STALE_DAYS } from '../../src/feeds/fetcher.js';
 import type { FeedSource } from '../../src/config/feeds.js';
 
 const mockSources: FeedSource[] = [
@@ -126,5 +138,59 @@ describe('fetchAllFeeds（リンクの解決）', () => {
   it('壊れたリンクの記事が1件混ざっても、同じフィードの正常な記事は fetchFeed を通って残る', async () => {
     const out = await fetchAllFeeds([{ ...base, name: 'Mixed', url: 'https://example.com/mixed.xml' }]);
     expect(out.map((a) => a.title)).toEqual(['Good Link']);
+  });
+});
+
+describe('fetchAllFeedsWithReport（取得元の鮮度）', () => {
+  const base = { category: 'AI/LLM' as const, language: 'en' as const, maxItems: 5 };
+  const DAY = 24 * 60 * 60 * 1000;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('止まったとみなす日数は 14 日', () => {
+    expect(STALE_DAYS).toBe(14);
+  });
+
+  it('最新の記事が 13 日前なら古くない、15 日前なら古い（最新日時も返す）', async () => {
+    const report = await fetchAllFeedsWithReport([
+      { ...base, name: 'Recent', url: 'https://example.com/age-13d.xml' },
+      { ...base, name: 'Stopped', url: 'https://example.com/age-15d.xml' },
+    ]);
+    expect(report.stale.map((s) => s.name)).toEqual(['Stopped']);
+    const newest = report.stale[0]?.newest;
+    expect(newest).toBeInstanceOf(Date);
+    expect(Math.round((Date.now() - (newest?.getTime() ?? 0)) / DAY)).toBe(15);
+    expect(report.failed).toEqual([]);
+  });
+
+  it('取得窓の外の記事しか無くても、最新が 3 日前なら古いとは言わない（最新日時は取得窓で絞る前に取る）', async () => {
+    const report = await fetchAllFeedsWithReport([{ ...base, name: 'Quiet', url: 'https://example.com/age-3d.xml' }]);
+    expect(report.articles).toEqual([]);
+    expect(report.stale).toEqual([]);
+  });
+
+  it('記事が0件のフィードは最新日時 null で古い側に入る', async () => {
+    const report = await fetchAllFeedsWithReport([{ ...base, name: 'Empty', url: 'https://example.com/empty.xml' }]);
+    expect(report.stale).toEqual([{ name: 'Empty', newest: null }]);
+    expect(report.failed).toEqual([]);
+  });
+
+  it('取得に失敗したフィードは failed に分け、stale には入れない', async () => {
+    const report = await fetchAllFeedsWithReport([
+      ...mockSources,
+      { ...base, name: 'Broken', url: 'https://error.example.com/feed' },
+    ]);
+    expect(report.failed).toEqual(['Broken']);
+    expect(report.stale).toEqual([]);
+    expect(report.articles).toHaveLength(3);
+  });
+
+  it('基準時刻を渡せる（30 日後から見ると、今日の記事しか無いフィードも古い）', async () => {
+    const later = new Date(Date.now() + 30 * DAY);
+    const report = await fetchAllFeedsWithReport(mockSources, later);
+    expect(report.articles).toEqual([]);
+    expect(report.stale.map((s) => s.name)).toEqual(['Test Blog']);
   });
 });

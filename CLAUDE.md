@@ -2,7 +2,7 @@
 
 ## このリポジトリ
 毎朝 JST 09:00 に GitHub Actions で実行する AI/テックニュースの自動配信システム。
-RSS 8 本・Hacker News の検索 5 本・NewsData.io でニュースを集め、BytePlus ModelArk の LLM で要約して Gmail で送る。
+RSS 10 本・Hacker News の検索 5 本・NewsData.io でニュースを集め、BytePlus ModelArk の LLM で要約して Gmail で送る。
 起動の仕組み（cron-job.org の primary と GitHub schedule の backup）と検査の回し方は README.md が正本。
 踏んだ罠は docs/LESSONS.md、1 周の回し方は docs/CYCLE.md にある。
 
@@ -19,11 +19,11 @@ RSS 8 本・Hacker News の検索 5 本・NewsData.io でニュースを集め�
 ## ディレクトリ構成
 ```
 src/
-  config/       # env.ts (Zod), feeds.ts (RSS 一覧), categories.ts, lookback.ts (取得窓 36h を共有)
-  feeds/        # types.ts, fetcher.ts (並列 RSS 取得), normalizer.ts (正規化)
+  config/       # env.ts (Zod), feeds.ts (RSS 一覧), categories.ts, lookback.ts (取得窓 36h を共有), digest.ts (1 通の上限 30 件)
+  feeds/        # types.ts, fetcher.ts (並列 RSS 取得・止まったフィードの検知), normalizer.ts (正規化)
   hn/           # client.ts (HN Algolia 検索)
   news-api/     # client.ts (NewsData.io), types.ts (Zod スキーマ)
-  categorizer/  # deduplicator.ts (重複排除), classifier.ts (キーワード分類)
+  categorizer/  # deduplicator.ts (重複排除), classifier.ts (キーワード分類), selector.ts (上限までの選別)
   ai/           # client.ts (ModelArk・構造化出力・バックオフ), summarizer.ts, trend-analyzer.ts, fallback.ts
   schedule/     # send-delay.ts (待機の上限・送信予定時刻)
   mail/         # types.ts, template-engine.ts, sender.ts

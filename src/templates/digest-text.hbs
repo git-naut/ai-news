@@ -16,12 +16,29 @@ AI News Digest
 {{#each articles}}
 
 ■ {{title}}
-  {{summary}}
+{{#if summary}}
+  何が: {{summary.what}}
+{{#if summary.change}}
+  差分: {{summary.change}}
+{{/if}}
+{{#if summary.tryIt}}
+  試す: {{summary.tryIt}}
+{{/if}}
+{{else}}
+  {{excerpt}}
+{{/if}}
   → {{url}}{{#if githubUrl}}
   [GitHub] {{githubUrl}}{{/if}}
   [{{sourceName}} / {{publishedAt}}]
 {{/each}}
 
 {{/each}}
+{{#if sourceNotes.length}}
+【取得元の状態】
+{{#each sourceNotes}}
+・{{this}}
+{{/each}}
+
+{{/if}}
 ──────────────────────────────────────
 このメールは GitHub Actions によって自動送信されています。

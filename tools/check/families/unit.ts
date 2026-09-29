@@ -19,6 +19,13 @@ export const ID = 'unit';
 export const TITLE = 'テストと型';
 export const speed = 'slow' as const;
 
+/**
+ * vitest と tsc の子プロセスの上限（ミリ秒）。逆テストの 8 並列では 1 回 254 秒かかった例があり
+ * （2026-09-29、見本づくりのブラウザと重なったとき）、240 秒の上限に当たって UNIT-X になった。
+ * 負荷の無いときは 75 秒前後。逆テストの子プロセスの上限（mutate.ts）より短くしておく。
+ */
+export const UNIT_CHILD_TIMEOUT_MS = 600_000;
+
 /** tsc をかけるプロジェクト。package.json の typecheck と同じ範囲に tests を足したもの。 */
 const TS_PROJECTS = ['tsconfig.json', 'tools/check/tsconfig.json', 'tests/tsconfig.json'];
 
@@ -34,7 +41,7 @@ function node(cwd: string, args: string[]): Promise<{ code: number | null; out: 
     let out = '';
     child.stdout.setEncoding('utf8').on('data', (d: string) => (out += d));
     child.stderr.setEncoding('utf8').on('data', (d: string) => (out += d));
-    const timer = setTimeout(() => child.kill('SIGKILL'), 240_000);
+    const timer = setTimeout(() => child.kill('SIGKILL'), UNIT_CHILD_TIMEOUT_MS);
     child.on('close', (code) => {
       clearTimeout(timer);
       resolve({ code, out });

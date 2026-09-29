@@ -1,10 +1,12 @@
 import { env } from './config/env.js';
 import { RSS_FEEDS } from './config/feeds.js';
-import { fetchAllFeeds } from './feeds/fetcher.js';
+import { fetchAllFeedsWithReport } from './feeds/fetcher.js';
 import { fetchNewsApi } from './news-api/client.js';
 import { fetchHackerNews, HN_QUERIES, hnSourceName } from './hn/client.js';
 import { deduplicate } from './categorizer/deduplicator.js';
 import { classifyArticles, buildSourceCategoryMap } from './categorizer/classifier.js';
+import { selectForDigest, buildTierOf, countByTier } from './categorizer/selector.js';
+import { DIGEST_LIMIT } from './config/digest.js';
 import { batchSummarize } from './ai/summarizer.js';
 import { analyzeTrends } from './ai/trend-analyzer.js';
 import { applyFallbackSummaries } from './ai/fallback.js';
@@ -24,11 +26,25 @@ async function main(): Promise<void> {
 
   // Step 1: ニュース取得（RSS + HN + News API を並列実行）
   console.log('[ai-news] ニュース取得中...');
-  const [rssArticles, hnArticles, apiArticles] = await Promise.all([
-    fetchAllFeeds(RSS_FEEDS),
+  const [rssReport, hnArticles, apiArticles] = await Promise.all([
+    fetchAllFeedsWithReport(RSS_FEEDS),
     fetchHackerNews(HN_QUERIES),
     fetchNewsApi(env.NEWS_API_KEY),
   ]);
+
+  const rssArticles = rssReport.articles;
+
+  // 取得元の健康状態。止まったフィードは記事が0件になるだけで、配信は黙って続いてしまう
+  // （Anthropic の第三者フィードは 2025-11 に止まり、10 か月気づかなかった）。
+  // ログに名前を出し、メールのフッターにも「取得元の状態」として載せる（buildTemplateData に渡す）
+  const sourceHealth = { stale: rssReport.stale, failed: rssReport.failed };
+  for (const s of sourceHealth.stale) {
+    const newest = s.newest ? s.newest.toISOString() : '記事なし';
+    console.warn(`[ai-news] 更新が止まっている取得元: ${s.name}（最新 ${newest}）`);
+  }
+  if (sourceHealth.failed.length > 0) {
+    console.warn(`[ai-news] 取得に失敗した取得元: ${sourceHealth.failed.join('、')}`);
+  }
 
   const allRaw = [...rssArticles, ...hnArticles, ...apiArticles];
   console.log(`[ai-news] 取得合計: ${allRaw.length}件 (RSS: ${rssArticles.length}, HN: ${hnArticles.length}, API: ${apiArticles.length})`);
@@ -41,7 +57,18 @@ async function main(): Promise<void> {
     ...RSS_FEEDS,
     ...HN_QUERIES.map((q) => ({ name: hnSourceName(q), category: q.category })),
   ]);
-  const classified = classifyArticles(deduped, sourceCategoryMap);
+  const classifiedAll = classifyArticles(deduped, sourceCategoryMap);
+
+  // 載せる件数を DIGEST_LIMIT で切る。要約の前に切り、LLM の呼び出しを減らす。
+  // 段1（英語の RSS と HN）、段2（日本語の RSS）、段3（NewsData.io）の順に残し、落とした件数は段ごとに出す
+  const tierOf = buildTierOf(RSS_FEEDS, HN_QUERIES);
+  const classified = selectForDigest(classifiedAll, { limit: DIGEST_LIMIT, tierOf });
+  if (classified.length < classifiedAll.length) {
+    const before = countByTier(classifiedAll, tierOf);
+    const after = countByTier(classified, tierOf);
+    const dropped = ([1, 2, 3] as const).map((t) => `段${t}: ${before[t] - after[t]}件`).join(', ');
+    console.log(`[ai-news] 上限 ${DIGEST_LIMIT} 件で ${classifiedAll.length - classified.length}件を落としました (${dropped})`);
+  }
 
   // Step 3: LLM（BytePlus ModelArk）による要約・トレンド分析
   // 失敗してもフォールバックでパイプラインを継続する
@@ -78,7 +105,7 @@ async function main(): Promise<void> {
   // Step 4: メール生成
   // 配信時刻は起動時刻ではなく送信予定時刻（now + 待ち）で描く
   const deliveryDate = formatJstDate(plannedSendTime(now, sleepMs));
-  const templateData = buildTemplateData(summarized, trends, deliveryDate);
+  const templateData = buildTemplateData(summarized, trends, deliveryDate, sourceHealth);
   const html = renderTemplate('digest', templateData);
   const text = renderTemplate('digest-text', templateData);
 

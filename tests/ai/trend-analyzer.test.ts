@@ -18,7 +18,7 @@ const a: Article = {
   content: null,
   language: 'en',
   category: 'AI/LLM',
-  summary: '新しい Flash モデル',
+  summary: { what: '新しい軽量モデルが出た。', change: '入力 0.25 ドル／100 万トークン。', tryIt: null },
 };
 
 const llm = { apiKey: 'ark-test', baseUrl: 'https://ark.example/api/v3' };

@@ -124,6 +124,12 @@ async function seed(root: string, dst: string): Promise<number> {
   return files.length;
 }
 
+/**
+ * 検査の子プロセスの上限（ミリ秒）。unit 系統は中で vitest と tsc を起こすので、その上限
+ * （UNIT_CHILD_TIMEOUT_MS）より長くする。短いと unit 系統が自分で止まる前に外側が殺し、結果が残らない。
+ */
+export const CHECK_CHILD_TIMEOUT_MS = 900_000;
+
 /** サブプロセスで検査を走らせた結果。 */
 type CheckRun = { ok: true; report: Report } | { ok: false; error: string };
 
@@ -144,7 +150,7 @@ function runCheck(wsRoot: string, family: string): Promise<CheckRun> {
     let err = '';
     child.stdout.setEncoding('utf8').on('data', (d: string) => (out += d));
     child.stderr.setEncoding('utf8').on('data', (d: string) => (err += d));
-    const timer = setTimeout(() => child.kill('SIGKILL'), 300_000);
+    const timer = setTimeout(() => child.kill('SIGKILL'), CHECK_CHILD_TIMEOUT_MS);
     child.on('close', (code) => {
       clearTimeout(timer);
       // 0 は緑、1 は赤。どちらも JSON を出す。それ以外は検査が動いていない
@@ -201,6 +207,18 @@ export function judge(
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([k, v]) => `${k} +${v}`)
       .join(' / ');
+
+  // 系統そのものが落ちた（<接頭辞>-X）だけの反応は、歯の有無を判定できない。escaped と数えると
+  // 「検査が転んだ」のを「歯が無い」と誤診する（2026-09-29、負荷で vitest が時間切れになった 2 本で踏んだ）。
+  // 期待そのものが -X の変異（系統が落ちることを確かめる変異）はこの扱いから外す
+  const crashed = Object.keys(grew).filter((k) => k.endsWith('-X') && k !== expect);
+  const meaningful = Object.keys(grew).filter((k) => !crashed.includes(k));
+  if (crashed.length > 0 && meaningful.length === 0) {
+    return {
+      outcome: 'error',
+      reason: `${list(grew)} だけが反応（検査そのものが落ちた。時間切れや例外を疑い、負荷の無い状態で回し直す）`,
+    };
+  }
 
   if (expect === 'NONE') {
     // 捕まえてはいけない変異。意味を変えていない書き換えで検査が反応したら、

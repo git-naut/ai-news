@@ -32,7 +32,7 @@ describe('generateFallbackSummary', () => {
 });
 
 describe('applyFallbackSummaries', () => {
-  it('全記事にフォールバック要約を設定する', () => {
+  it('全記事を要約なし（summary: null）にする。メールは本文の抜粋を出す', () => {
     const articles = [
       {
         ...mockArticle,
@@ -41,6 +41,6 @@ describe('applyFallbackSummaries', () => {
       },
     ];
     const result = applyFallbackSummaries(articles);
-    expect(result[0]?.summary).toBe('This is the article content.');
+    expect(result[0]?.summary).toBeNull();
   });
 });
