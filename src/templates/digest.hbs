@@ -54,10 +54,12 @@
                     <td style="width:3em;vertical-align:top;color:#888;white-space:nowrap;">何が</td>
                     <td style="vertical-align:top;padding-bottom:3px;">{{summary.what}}</td>
                   </tr>
+                  {{#if summary.change}}
                   <tr>
                     <td style="width:3em;vertical-align:top;color:#888;white-space:nowrap;">差分</td>
                     <td style="vertical-align:top;padding-bottom:3px;">{{summary.change}}</td>
                   </tr>
+                  {{/if}}
                   {{#if summary.tryIt}}
                   <tr>
                     <td style="width:3em;vertical-align:top;color:#1a73e8;white-space:nowrap;">試す</td>

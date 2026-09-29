@@ -27,7 +27,7 @@ export function findSummaryIssues(s: DigestSummary): string[] {
   for (const [name, value] of fields) {
     if (value === null) continue;
     if (value.trim() === '') {
-      if (name !== 'tryIt') issues.push(`${name} が空`);
+      if (name === 'what') issues.push(`${name} が空`);
       continue;
     }
     const len = [...value].length;

@@ -209,3 +209,17 @@ describe('取得元の状態', () => {
     for (const name of ['digest-text', 'digest']) expect(renderTemplate(name, data)).not.toContain('取得元の状態');
   });
 });
+
+describe('差分の無い要約', () => {
+  const noChange: Article = { ...mockArticles[2]!, summary: { what: 'pnpm 11 の解説記事。', change: null, tryIt: null } };
+
+  it('テキストでも HTML でも「差分」の行を出さない', () => {
+    const data = buildTemplateData([noChange], [], DATE);
+    const text = renderTemplate('digest-text', data);
+    const html = renderTemplate('digest', data);
+    expect(text).toContain('何が: pnpm 11 の解説記事。');
+    expect(text).not.toContain('差分:');
+    expect(html).toContain('pnpm 11 の解説記事。');
+    expect(html).not.toContain('>差分<');
+  });
+});

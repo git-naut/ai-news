@@ -36,7 +36,7 @@ async function main(): Promise<void> {
 
   // 取得元の健康状態。止まったフィードは記事が0件になるだけで、配信は黙って続いてしまう
   // （Anthropic の第三者フィードは 2025-11 に止まり、10 か月気づかなかった）。
-  // メール本文への載せ方は template-engine.ts 側で組むので、ここでは名前をログに出す
+  // ログに名前を出し、メールのフッターにも「取得元の状態」として載せる（buildTemplateData に渡す）
   const sourceHealth = { stale: rssReport.stale, failed: rssReport.failed };
   for (const s of sourceHealth.stale) {
     const newest = s.newest ? s.newest.toISOString() : '記事なし';

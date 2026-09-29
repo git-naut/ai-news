@@ -18,7 +18,9 @@ const CONTENT_EXCERPT_LENGTH = 500;
 
 /** 要約の応答スキーマ（検証用） */
 const summarySchema = z.object({
-  items: z.array(z.object({ id: z.string(), what: z.string().min(1), change: z.string().min(1), tryIt: z.string() })),
+  // 欄の空は記事ごとに扱う。min(1) で縛るとバッチ全体が検証に落ち、5 件まとめて予備モデルでやり直すことになる
+  // （2026-09-29 の見本づくりで 2 回とも 1 バッチずつ change が空で返った）
+  items: z.array(z.object({ id: z.string(), what: z.string(), change: z.string(), tryIt: z.string() })),
 });
 
 /** 要約の応答スキーマ（構造化出力として API に渡す） */
@@ -88,8 +90,12 @@ ${articleList}`;
   const summaryMap = new Map<string, DigestSummary>();
   for (const item of parsed.items) {
     if (!wanted.has(item.id)) continue;
+    const what = item.what.trim();
+    // 何がの欄が空の記事は要約なしにする（メールは本文の抜粋を出す）
+    if (what === '') continue;
+    const change = item.change.trim();
     const tryIt = item.tryIt.trim();
-    summaryMap.set(item.id, { what: item.what.trim(), change: item.change.trim(), tryIt: tryIt === '' ? null : tryIt });
+    summaryMap.set(item.id, { what, change: change === '' ? null : change, tryIt: tryIt === '' ? null : tryIt });
   }
   return summaryMap;
 }

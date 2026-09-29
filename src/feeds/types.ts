@@ -25,8 +25,8 @@ export interface RawArticle {
 export interface DigestSummary {
   /** 何が出たか・何が起きたか */
   what: string;
-  /** 従来との差。数字があれば含める */
-  change: string;
+  /** 従来との差。数字があれば含める。差として書けることが無い記事は null */
+  change: string | null;
   /** 試せるもの（リポジトリ・API・ツール名）。無ければ null */
   tryIt: string | null;
 }

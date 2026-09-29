@@ -96,4 +96,29 @@ describe('batchSummarize', () => {
     const prompt = vi.mocked(generateJson).mock.calls[0]?.[1].prompt ?? '';
     for (const word of ['what', 'change', 'tryIt', '大幅', '革命的']) expect(prompt).toContain(word);
   });
+
+  it('差分が空の記事は change を null にし、同じバッチの他の記事と一緒に残す（予備モデルでやり直さない）', async () => {
+    vi.mocked(generateJson).mockResolvedValue({
+      items: [
+        { id: 'a1', what: '何が1', change: '', tryIt: '' },
+        { id: 'a2', what: '何が2', change: '差分2', tryIt: '' },
+      ],
+    });
+    const result = await batchSummarize(llm, [article('a1'), article('a2')], { sleep: noSleep });
+    expect(result[0]?.summary).toEqual({ what: '何が1', change: null, tryIt: null });
+    expect(result[1]?.summary?.change).toBe('差分2');
+    expect(vi.mocked(generateJson)).toHaveBeenCalledTimes(1);
+  });
+
+  it('何がの欄が空の記事だけ要約なしにし、他の記事は残す', async () => {
+    vi.mocked(generateJson).mockResolvedValue({
+      items: [
+        { id: 'a1', what: ' ', change: '差分1', tryIt: '' },
+        { id: 'a2', what: '何が2', change: '差分2', tryIt: '' },
+      ],
+    });
+    const result = await batchSummarize(llm, [article('a1'), article('a2')], { sleep: noSleep });
+    expect(result[0]?.summary).toBeNull();
+    expect(result[1]?.summary?.what).toBe('何が2');
+  });
 });

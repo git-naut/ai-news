@@ -13,8 +13,8 @@ describe('findSummaryIssues', () => {
     expect(issues).toEqual(expect.arrayContaining(['change に誇張の語「大幅」', 'change に誇張の語「革命的」']));
   });
 
-  it('what と change が空なら指摘する。tryIt は null でよい', () => {
-    expect(findSummaryIssues({ what: ' ', change: '', tryIt: null })).toEqual(['what が空', 'change が空']);
+  it('what が空なら指摘する。change と tryIt は null でよい', () => {
+    expect(findSummaryIssues({ what: ' ', change: null, tryIt: null })).toEqual(['what が空']);
   });
 
   it(`各欄は ${SUMMARY_FIELD_MAX} 文字まで`, () => {
