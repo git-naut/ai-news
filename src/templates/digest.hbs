@@ -5,32 +5,37 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>AI News Digest</title>
 </head>
-<body style="margin:0;padding:0;background-color:#f5f5f5;font-family:-apple-system,'Helvetica Neue',Arial,sans-serif;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f5f5f5;padding:20px 0;">
+<!--
+  DADS（デジタル庁デザインシステム）準拠。値は src/mail/dads-palette.ts の表だけを使う（テストで検査）。
+  Gmail は CSS 変数・外部 CSS・Web フォントを読まないので、役割トークンを実際の値にしてインラインで書く。
+  余白は 8px 基準（4/8/12/16/24）、字は 12/14/15/18px、太さは 400/700 のみ。
+-->
+<body style="margin:0;padding:0;background-color:#f3f5f8;color:#1a1c1f;font-family:'Noto Sans JP', -apple-system, BlinkMacSystemFont, sans-serif;font-size:14px;line-height:1.7;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f3f5f8;padding:16px 0;">
     <tr>
-      <td align="center">
+      <td align="center" style="padding:0 8px;">
         <!-- 1 カラム。スマホの Gmail でも折り返しが崩れないよう、幅は最大 600px の可変にする -->
-        <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
+        <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
 
-          <!-- ヘッダー -->
+          <!-- ヘッダー（app-header: 白地・下罫線） -->
           <tr>
-            <td style="background-color:#1a1a2e;border-radius:8px 8px 0 0;padding:24px 24px;">
-              <h1 style="margin:0;color:#ffffff;font-size:22px;font-weight:700;">◆ AI News Digest</h1>
-              <p style="margin:8px 0 0;color:#a0a0c0;font-size:14px;">{{deliveryDate}} ・ {{totalCount}}件の記事</p>
+            <td style="background-color:#ffffff;border:1px solid #dde2e8;border-bottom:4px solid #378bca;border-radius:12px 12px 0 0;padding:16px 24px;">
+              <h1 style="margin:0;font-size:18px;font-weight:700;line-height:1.5;color:#1a1c1f;">AI News Digest</h1>
+              <p style="margin:4px 0 0;font-size:12px;font-weight:400;color:#52585f;">{{deliveryDate}}・{{totalCount}}件の記事</p>
             </td>
           </tr>
 
           {{#if hasTrends}}
           <!-- 今週のトレンド（記事より前に置く） -->
           <tr>
-            <td style="background-color:#ffffff;padding:16px 24px;border-left:1px solid #e0e0e0;border-right:1px solid #e0e0e0;">
-              <h2 style="margin:0 0 12px;font-size:15px;font-weight:700;color:#1a1a2e;border-left:4px solid #1a73e8;padding-left:10px;">▲ 今週のトレンド</h2>
+            <td style="background-color:#ffffff;border-left:1px solid #dde2e8;border-right:1px solid #dde2e8;padding:16px 24px 8px;">
+              <h2 style="margin:0 0 8px;font-size:15px;font-weight:700;line-height:1.5;color:#1b4f7a;">今週のトレンド</h2>
               {{#each trends}}
-              <div style="margin-bottom:8px;padding:10px 14px;background-color:#f8f9ff;border-radius:6px;">
-                <p style="margin:0 0 3px;font-size:14px;font-weight:600;color:#1a1a2e;">{{trend}}</p>
-                <p style="margin:0;font-size:13px;color:#555;line-height:1.6;">{{description}}</p>
+              <div style="margin:0 0 8px;padding:12px 16px;background-color:#eaf3fb;border-radius:8px;">
+                <p style="margin:0;font-size:14px;font-weight:700;color:#1a1c1f;">{{trend}}</p>
+                <p style="margin:4px 0 0;font-size:14px;font-weight:400;color:#52585f;">{{description}}</p>
                 {{#if action}}
-                <p style="margin:5px 0 0;font-size:12px;color:#1a73e8;font-weight:600;">→ 試す: {{action}}</p>
+                <p style="margin:4px 0 0;font-size:14px;font-weight:700;color:#1b4f7a;">試す: {{action}}</p>
                 {{/if}}
               </div>
               {{/each}}
@@ -38,42 +43,40 @@
           </tr>
           {{/if}}
 
-          <!-- カテゴリ別の記事（1 カラム） -->
+          <!-- カテゴリ別の記事（card） -->
           {{#each categories}}
           <tr>
-            <td style="background-color:#ffffff;padding:16px 24px;border-left:1px solid #e0e0e0;border-right:1px solid #e0e0e0;border-top:1px solid #f0f0f0;">
-              <h2 style="margin:0 0 10px;font-size:15px;font-weight:700;color:#1a1a2e;border-left:4px solid #34a853;padding-left:10px;">
-                {{icon}} {{name}} <span style="font-size:12px;font-weight:400;color:#888;">({{articles.length}}件)</span>
-              </h2>
+            <td style="background-color:#ffffff;border-left:1px solid #dde2e8;border-right:1px solid #dde2e8;padding:16px 24px 8px;">
+              <h2 style="margin:0 0 8px;font-size:15px;font-weight:700;line-height:1.5;color:#1b4f7a;">{{name}}<span style="font-size:12px;font-weight:400;color:#52585f;">（{{articles.length}}件）</span></h2>
               {{#each articles}}
-              <div style="margin-bottom:10px;padding:12px 14px;border:1px solid #e8e8e8;border-radius:6px;background-color:#fafafa;">
-                <a href="{{url}}" style="text-decoration:none;color:#1a73e8;font-size:15px;font-weight:600;line-height:1.45;display:block;margin-bottom:8px;">{{title}}</a>
+              <div style="margin:0 0 12px;padding:12px 16px;background-color:#ffffff;border:1px solid #dde2e8;border-radius:12px;">
+                <a href="{{url}}" style="display:block;margin:0 0 8px;font-size:15px;font-weight:700;line-height:1.5;color:#1b4f7a;text-decoration:underline;">{{title}}</a>
                 {{#if summary}}
-                <table width="100%" cellpadding="0" cellspacing="0" style="font-size:13px;color:#333;line-height:1.6;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-size:14px;line-height:1.7;color:#1a1c1f;">
                   <tr>
-                    <td style="width:3em;vertical-align:top;color:#888;white-space:nowrap;">何が</td>
-                    <td style="vertical-align:top;padding-bottom:3px;">{{summary.what}}</td>
+                    <td style="width:3em;vertical-align:top;padding:0 0 4px;font-size:12px;font-weight:700;color:#52585f;white-space:nowrap;">何が</td>
+                    <td style="vertical-align:top;padding:0 0 4px;">{{summary.what}}</td>
                   </tr>
                   {{#if summary.change}}
                   <tr>
-                    <td style="width:3em;vertical-align:top;color:#888;white-space:nowrap;">差分</td>
-                    <td style="vertical-align:top;padding-bottom:3px;">{{summary.change}}</td>
+                    <td style="width:3em;vertical-align:top;padding:0 0 4px;font-size:12px;font-weight:700;color:#52585f;white-space:nowrap;">差分</td>
+                    <td style="vertical-align:top;padding:0 0 4px;">{{summary.change}}</td>
                   </tr>
                   {{/if}}
                   {{#if summary.tryIt}}
                   <tr>
-                    <td style="width:3em;vertical-align:top;color:#1a73e8;white-space:nowrap;">試す</td>
-                    <td style="vertical-align:top;color:#1a73e8;">{{summary.tryIt}}</td>
+                    <td style="width:3em;vertical-align:top;padding:0 0 4px;font-size:12px;font-weight:700;color:#1b4f7a;white-space:nowrap;">試す</td>
+                    <td style="vertical-align:top;padding:0 0 4px;font-weight:700;color:#1b4f7a;">{{summary.tryIt}}</td>
                   </tr>
                   {{/if}}
                 </table>
                 {{else}}
-                <p style="margin:0;font-size:13px;color:#555;line-height:1.6;">{{excerpt}}</p>
+                <p style="margin:0;font-size:14px;font-weight:400;color:#52585f;">{{excerpt}}</p>
                 {{/if}}
-                <p style="margin:8px 0 0;font-size:11px;color:#999;">
-                  <span style="color:#888;background-color:#f0f0f0;padding:2px 6px;border-radius:3px;">{{sourceName}}</span>
-                  {{#if githubUrl}}<a href="{{githubUrl}}" style="color:#fff;background-color:#24292e;padding:2px 6px;border-radius:3px;text-decoration:none;margin-left:4px;">GitHub</a>{{/if}}
-                  <span style="margin-left:6px;">{{publishedAt}}</span>
+                <p style="margin:8px 0 0;font-size:12px;font-weight:400;line-height:1.5;color:#52585f;">
+                  <span style="display:inline-block;padding:2px 8px;border-radius:999px;background-color:#e6e6e6;color:#52585f;font-weight:700;">{{sourceName}}</span>
+                  {{#if githubUrl}}<a href="{{githubUrl}}" style="display:inline-block;margin-left:4px;padding:2px 8px;border-radius:999px;background-color:#d7e8f6;color:#1b4f7a;font-weight:700;text-decoration:underline;">GitHub</a>{{/if}}
+                  <span style="margin-left:8px;">{{publishedAt}}</span>
                 </p>
               </div>
               {{/each}}
@@ -83,15 +86,17 @@
 
           <!-- フッター -->
           <tr>
-            <td style="background-color:#f0f0f0;padding:20px 24px;border-radius:0 0 8px 8px;border:1px solid #e0e0e0;border-top:none;">
+            <td style="background-color:#ffffff;border:1px solid #dde2e8;border-top:1px solid #eef1f5;border-radius:0 0 12px 12px;padding:16px 24px;">
               {{#if sourceNotes.length}}
-              <p style="margin:0 0 6px;font-size:12px;color:#b06000;font-weight:600;">取得元の状態</p>
-              {{#each sourceNotes}}
-              <p style="margin:0 0 3px;font-size:12px;color:#b06000;">・{{this}}</p>
-              {{/each}}
-              <p style="margin:0 0 10px;"></p>
+              <!-- 取得元の状態（alert.warning: 色と文言の両方で伝える） -->
+              <div role="status" style="margin:0 0 12px;padding:12px 16px;background-color:#fbf0da;border:1px solid #9a6206;border-radius:8px;color:#9a6206;">
+                <p style="margin:0 0 4px;font-size:14px;font-weight:700;">取得元の状態</p>
+                {{#each sourceNotes}}
+                <p style="margin:0;font-size:14px;font-weight:400;">・{{this}}</p>
+                {{/each}}
+              </div>
               {{/if}}
-              <p style="margin:0;font-size:12px;color:#888;text-align:center;">このメールは GitHub Actions によって自動送信されています。</p>
+              <p style="margin:0;font-size:12px;font-weight:400;color:#52585f;text-align:center;">このメールは GitHub Actions によって自動送信されています。</p>
             </td>
           </tr>
 
