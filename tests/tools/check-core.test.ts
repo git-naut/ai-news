@@ -127,3 +127,10 @@ describe('子プロセスの上限', () => {
     expect(UNIT_CHILD_TIMEOUT_MS).toBeGreaterThanOrEqual(2 * 254_000);
   });
 });
+
+describe('vitest の上限', () => {
+  it('テストの上限は 30 秒（既定の 5 秒は負荷のかかった逆テストで足りなかった）', async () => {
+    const { default: config } = (await import('../../vitest.config.js')) as { default: { test?: { testTimeout?: number } } };
+    expect(config.test?.testTimeout).toBe(30_000);
+  });
+});
