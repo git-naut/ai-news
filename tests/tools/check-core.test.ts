@@ -5,7 +5,8 @@ import { join } from 'node:path';
 import { makeContext } from '../../tools/check/context.js';
 import type { FamilyEntry } from '../../tools/check/families/index.js';
 import { parseMarkers } from '../../tools/check/families/lessons.js';
-import { judge } from '../../tools/check/mutate.js';
+import { judge, CHECK_CHILD_TIMEOUT_MS } from '../../tools/check/mutate.js';
+import { UNIT_CHILD_TIMEOUT_MS } from '../../tools/check/families/unit.js';
 import { makeResult, vacuous } from '../../tools/check/result.js';
 import { runFamilies } from '../../tools/check/runner.js';
 import { NotApplicable, Workspace, replaceOnce } from '../../tools/check/workspace.js';
@@ -38,6 +39,20 @@ describe('judge', () => {
   it('NONE で何も増えなければ caught、増えたら false_positive', () => {
     expect(judge('NONE', { 'SEC-2': 1 }, { 'SEC-2': 1 }).outcome).toBe('caught');
     expect(judge('NONE', {}, { 'LES-3': 1 }).outcome).toBe('false_positive');
+  });
+  it('系統そのものが落ちた（<接頭辞>-X だけが増えた）ときは escaped ではなく error にする', () => {
+    // 2026-09-29、8 並列の負荷で vitest が 240 秒の上限に当たり、UNIT-X が出た 2 本を escaped と誤って数えた
+    const v = judge('UNIT-1', {}, { 'UNIT-X': 1 });
+    expect(v.outcome).toBe('error');
+    expect(v.reason).toContain('UNIT-X');
+    expect(judge('NONE', {}, { 'UNIT-X': 1 }).outcome).toBe('error');
+  });
+  it('系統が落ちること自体を期待する変異（期待が -X）は、これまでどおり caught', () => {
+    expect(judge('SEC-X', {}, { 'SEC-X': 1 }).outcome).toBe('caught');
+  });
+  it('-X と別の検査が両方増えたら、-X でない方で判定する', () => {
+    expect(judge('UNIT-1', {}, { 'UNIT-1': 2, 'UNIT-X': 1 }).outcome).toBe('caught');
+    expect(judge('UNIT-1', {}, { 'UNIT-2': 1, 'UNIT-X': 1 }).outcome).toBe('escaped');
   });
 });
 
@@ -101,5 +116,14 @@ describe('replaceOnce', () => {
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
+  });
+});
+
+describe('子プロセスの上限', () => {
+  it('逆テストの上限は unit 系統の上限より長い（外側が先に殺すと結果が残らない）', () => {
+    expect(CHECK_CHILD_TIMEOUT_MS).toBeGreaterThan(UNIT_CHILD_TIMEOUT_MS);
+  });
+  it('unit 系統の上限は、負荷のかかった逆テストで実測した 254 秒の 2 倍以上', () => {
+    expect(UNIT_CHILD_TIMEOUT_MS).toBeGreaterThanOrEqual(2 * 254_000);
   });
 });
