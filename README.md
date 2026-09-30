@@ -60,12 +60,12 @@ pnpm start             # SEND_AT_UTC を空にすると即時に送る
 - `GMAIL_APP_PASSWORD`
 - `RECIPIENT_EMAIL`
 
-cron-job.org の設定は次のとおりです。PAT は Fine-grained token（Actions の read/write）です。2026-06-23 に起動が止まったので、失効日をここに書いておきます（失効日は未記入）。
+cron-job.org の設定は次のとおりです。PAT は Fine-grained token（Actions の read/write、期限なし、2026-09-29 に作り直した `ai-news`）です。2026-06-23 から呼び出しが失敗し続け、7/19 にジョブが自動で止まっていました（docs/LESSONS.md の OPS-001）。
 
 | 項目 | 値 |
 |---|---|
 | URL | `https://api.github.com/repos/git-naut/ai-news/actions/workflows/daily-news.yml/dispatches` |
-| スケジュール | `45 23 * * *`（UTC）、POST |
+| スケジュール | 毎日 8:45（ジョブの時間帯は Asia/Tokyo。UTC の 23:45）、POST |
 | Body | `{"ref":"main","inputs":{"immediate":"false"}}` |
 
 cron-job.org の既定の設定では、失敗してもメールは来ず、応答の本文も残りません。失敗が 25 回を超えるとジョブは自動で止まり、履歴はジョブごとに直近 50 件だけ残ります。次の 3 つを必ず見直します。
