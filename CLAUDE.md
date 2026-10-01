@@ -10,7 +10,7 @@ RSS 10 本・Hacker News の検索 5 本・NewsData.io でニュースを集め�
 - TypeScript + ESM（`"type": "module"`）。CI は Node.js 24、手元は 22 で、`engines.node` は `>=22`
 - pnpm は `packageManager: pnpm@10.34.5` で固定する。CI の pnpm/action-setup には with.version を書かない
 - LLM は BytePlus ModelArk。OpenAI 互換の REST を fetch で直接呼ぶ
-  - 主は `seed-2-0-lite-260428`、予備は `seed-2-0-lite-260228`
+  - 主は `seed-2-0-lite-260428`、予備は `seed-2-0-mini-260428`
 - Hacker News は公式の検索 API（Algolia）で取る
 - NewsData.io は RSS を補う
 - nodemailer と Gmail SMTP で送り、本文は Handlebars で組む

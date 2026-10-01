@@ -10,8 +10,10 @@
 #                   GITHUB_OUTPUT, NOW_EPOCH（テスト用。未指定なら現在時刻）
 # 出力: kind, should_send, send_at_utc
 #
-# schedule は実測で 2〜12 時間遅れる。primary 枠の起点を「現在以前で最も新しい UTC 23:35」に
-# 置くことで、backup がいつ動いても前夜の primary だけを見る。
+# schedule は実測で 2〜12 時間遅れる。起点は「現在以前で最も新しい予定時刻 UTC 04:00」の前夜 23:35 に置く。
+# schedule は予定時刻より前には動かないので、遅れが 24 時間未満なら必ず正しい夜の primary を見る。
+# 旧実装は「現在以前で最も新しい 23:35」を起点にしたので、19 時間 35 分以上遅れると翌朝の primary を探して
+# 予備配信を誤って送った。
 set -uo pipefail
 
 emit() {
@@ -45,10 +47,12 @@ esac
 
 NOW="${NOW_EPOCH:-$(date -u +%s)}"
 TODAY=$(date -u -d "@$NOW" +%Y-%m-%d)
-SLOT=$(date -u -d "$TODAY 23:35:00" +%s)
-if [ "$SLOT" -gt "$NOW" ]; then
-  SLOT=$((SLOT - 86400))
+SCHEDULED=$(date -u -d "$TODAY 04:00:00" +%s)
+if [ "$SCHEDULED" -gt "$NOW" ]; then
+  SCHEDULED=$((SCHEDULED - 86400))
 fi
+# 予定時刻 04:00 の 4 時間 25 分前 = 前夜の 23:35
+SLOT=$((SCHEDULED - 4 * 3600 - 25 * 60))
 SINCE=$(date -u -d "@$SLOT" +%Y-%m-%dT%H:%M:%SZ)
 echo "backup: $SINCE 以降に primary の送信が成功しているか確認します。"
 

@@ -148,4 +148,31 @@ describe('decide-delivery.sh', () => {
     const r = decide({ EVENT_NAME: 'schedule', NOW_EPOCH: epoch('2026-09-29T06:10:00Z') });
     expect(r.ghCalls[0]).toContain(encodeURIComponent('>=') + '2026-09-28T23:35:00Z');
   });
+
+  it('起点は予定時刻（UTC 04:00）の前夜。19 時間 40 分遅れて UTC 23:40 に動いても、前夜の primary を探す', () => {
+    // 旧実装は「現在より前で最も新しい 23:35」を起点にしたので、この時刻だと当日の 23:35 になり、
+    // まだ来ていない翌朝の primary を探して予備配信を誤って送った
+    const r = decide({ EVENT_NAME: 'schedule', NOW_EPOCH: epoch('2026-09-29T23:40:00Z') }, [
+      primarySent(1, '2026-09-28T23:45:15Z'),
+    ]);
+    expect(r.ghCalls[0]).toContain(encodeURIComponent('>=') + '2026-09-28T23:35:00Z');
+    expect(r.outputs.should_send).toBe('false');
+  });
+
+  it('翌朝の primary が待機中（未完了）でも、前夜の primary が送れていれば予備配信を送らない', () => {
+    const r = decide({ EVENT_NAME: 'schedule', NOW_EPOCH: epoch('2026-09-29T23:55:00Z') }, [
+      primarySent(1, '2026-09-28T23:45:15Z'),
+      { id: 2, created_at: '2026-09-29T23:45:10Z', jobs: [{ name: 'send-digest (primary)', conclusion: null }] },
+    ]);
+    expect(r.outputs.should_send).toBe('false');
+  });
+
+  it('予定時刻（UTC 04:00）より前に動いた手動の確認（simulate_schedule）は、前日の予定日として扱う', () => {
+    const r = decide({
+      EVENT_NAME: 'workflow_dispatch',
+      INPUT_SIMULATE_SCHEDULE: 'true',
+      NOW_EPOCH: epoch('2026-09-29T02:00:00Z'),
+    });
+    expect(r.ghCalls[0]).toContain(encodeURIComponent('>=') + '2026-09-27T23:35:00Z');
+  });
 });

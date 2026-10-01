@@ -71,10 +71,14 @@ function extractGithubUrl(content: string | null): string | null {
   return match?.[0] ?? null;
 }
 
-/** 取得元の状態。fetchAllFeedsWithReport の stale と failed */
+/** 配信の状態。取得元（fetchAllFeedsWithReport の stale と failed）と、要約・トレンドの出来 */
 export interface SourceHealth {
   stale: { name: string; newest: Date | null }[];
   failed: string[];
+  /** 要約できず本文の抜粋を載せた記事の数 */
+  summaryMissing?: number;
+  /** トレンドを作れなかった（記事はあるのにトレンドが 0 件） */
+  trendFailed?: boolean;
 }
 
 /**
@@ -89,6 +93,20 @@ function describeSourceHealth(health: SourceHealth): string[] {
       : `${s.name} は記事がありません`
   );
   return [...lines, ...health.failed.map((name) => `${name} は取得に失敗しました`)];
+}
+
+/**
+ * 要約とトレンドの出来をメールのフッターに出す行にする。
+ * LLM が使えなくなっても、メールは本文の抜粋で毎日届き続ける。要約が無いことに受信箱で気づけるようにする。
+ * @param health 配信の状態
+ */
+function describeSummaryHealth(health: SourceHealth): string[] {
+  const lines: string[] = [];
+  if ((health.summaryMissing ?? 0) > 0) {
+    lines.push(`要約できなかった記事が ${health.summaryMissing ?? 0} 件あります（本文の抜粋を載せています）`);
+  }
+  if (health.trendFailed === true) lines.push('トレンドを作れませんでした');
+  return lines;
 }
 
 /**
@@ -132,7 +150,7 @@ export function buildTemplateData(
     categories,
     trends,
     hasTrends: trends.length > 0,
-    sourceNotes: describeSourceHealth(health),
+    sourceNotes: [...describeSourceHealth(health), ...describeSummaryHealth(health)],
   };
 }
 

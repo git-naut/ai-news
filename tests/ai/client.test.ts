@@ -131,3 +131,25 @@ describe('generateJson', () => {
     await expect(run(fakeFetch(401, 404))).rejects.toThrow('404');
   });
 });
+
+describe('トークンの使用量', () => {
+  it('応答の usage を足し上げ、takeTokenUsage で読み出して 0 に戻す', async () => {
+    const { takeTokenUsage } = await import('../../src/ai/client.js');
+    takeTokenUsage();
+    const withUsage = (p: number, c: number): unknown => ({
+      choices: [{ message: { content: good }, finish_reason: 'stop' }],
+      usage: { prompt_tokens: p, completion_tokens: c, total_tokens: p + c },
+    });
+    await run(fakeFetch(withUsage(1200, 300)));
+    await run(fakeFetch(withUsage(800, 200)));
+    expect(takeTokenUsage()).toEqual({ calls: 2, promptTokens: 2000, completionTokens: 500 });
+    expect(takeTokenUsage()).toEqual({ calls: 0, promptTokens: 0, completionTokens: 0 });
+  });
+
+  it('usage が無い応答でも数え損ねて落ちない（呼び出しの回数だけ数える）', async () => {
+    const { takeTokenUsage } = await import('../../src/ai/client.js');
+    takeTokenUsage();
+    await run(fakeFetch(okBody(good)));
+    expect(takeTokenUsage()).toEqual({ calls: 1, promptTokens: 0, completionTokens: 0 });
+  });
+});

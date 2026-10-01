@@ -8,6 +8,7 @@ import { classifyArticles, buildSourceCategoryMap } from './categorizer/classifi
 import { selectForDigest, buildTierOf, countByTier } from './categorizer/selector.js';
 import { DIGEST_LIMIT } from './config/digest.js';
 import { batchSummarize } from './ai/summarizer.js';
+import { takeTokenUsage } from './ai/client.js';
 import { analyzeTrends } from './ai/trend-analyzer.js';
 import { applyFallbackSummaries } from './ai/fallback.js';
 import { buildTemplateData, renderTemplate, formatJstDate } from './mail/template-engine.js';
@@ -105,7 +106,17 @@ async function main(): Promise<void> {
   // Step 4: メール生成
   // 配信時刻は起動時刻ではなく送信予定時刻（now + 待ち）で描く
   const deliveryDate = formatJstDate(plannedSendTime(now, sleepMs));
-  const templateData = buildTemplateData(summarized, trends, deliveryDate, sourceHealth);
+  const tokens = takeTokenUsage();
+  console.log(`[ai-news] LLM の使用量: 呼び出し ${tokens.calls}回 / 入力 ${tokens.promptTokens} / 出力 ${tokens.completionTokens} トークン`);
+
+  // 要約とトレンドの出来もフッターに出す。LLM が止まっても抜粋で届き続けるので、受信箱で気づけるようにする
+  const summaryMissing = summarized.filter((a) => a.summary === null).length;
+  if (summaryMissing > 0) console.warn(`[ai-news] 要約できなかった記事: ${summaryMissing}件`);
+  const templateData = buildTemplateData(summarized, trends, deliveryDate, {
+    ...sourceHealth,
+    summaryMissing,
+    trendFailed: summarized.length > 0 && trends.length === 0,
+  });
   const html = renderTemplate('digest', templateData);
   const text = renderTemplate('digest-text', templateData);
 
