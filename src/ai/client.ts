@@ -4,10 +4,12 @@ import type { z } from 'zod';
  * LLM のモデル識別子（BytePlus ModelArk、ap-southeast-1）。
  * 2026-09-29 に Gemini から移した。手元のキーのプロジェクトは前払い課金の残高が 0 で
  * 3.x 系が 402、2.5 系は新 SDK から 404（新規ユーザーには提供しない）だったため。
- * 両モデルとも 2026-09-29 に構造化出力で 200 を実測した（lite-260428 は 4.2 秒、260228 は 11.3 秒）。
+ * 主の lite-260428 は 2026-09-29 に構造化出力で 200 を実測した（4.2 秒）。
+ * 予備は当初 lite-260228 だったが、ModelArk の廃止表で 2026-11-11 に停止する予定と分かったので、
+ * 2026-10-01 に mini-260428 へ替えた（構造化出力で 200、1.0 秒）。
  */
 export const PRIMARY_MODEL = 'seed-2-0-lite-260428';
-export const FALLBACK_MODEL = 'seed-2-0-lite-260228';
+export const FALLBACK_MODEL = 'seed-2-0-mini-260428';
 
 /**
  * 出力トークンの上限。送らないと 4,096 で打ち切られ、JSON が途中で切れる。
@@ -71,6 +73,27 @@ export class HttpError extends Error {
     super(`HTTP ${status}: ${body.slice(0, 200)}`);
     this.name = 'HttpError';
   }
+}
+
+/** 1 回の実行で使ったトークン。ModelArk の無料枠は 1 モデルあたり 50 万トークンなので、実測して残りを見積もる */
+export interface TokenUsage {
+  calls: number;
+  promptTokens: number;
+  completionTokens: number;
+}
+
+const usage: TokenUsage = { calls: 0, promptTokens: 0, completionTokens: 0 };
+
+/**
+ * ここまでに足し上げたトークンの使用量を返し、0 に戻す。
+ * @returns 呼び出しの回数と、入力・出力のトークン数
+ */
+export function takeTokenUsage(): TokenUsage {
+  const out = { ...usage };
+  usage.calls = 0;
+  usage.promptTokens = 0;
+  usage.completionTokens = 0;
+  return out;
 }
 
 /** sleep ユーティリティ */
@@ -157,7 +180,13 @@ async function completeOnce<T>(
   const text = await res.text();
   if (!res.ok) throw new HttpError(res.status, text);
 
-  const body = JSON.parse(text) as { choices?: { message?: { content?: unknown }; finish_reason?: unknown }[] };
+  const body = JSON.parse(text) as {
+    choices?: { message?: { content?: unknown }; finish_reason?: unknown }[];
+    usage?: { prompt_tokens?: unknown; completion_tokens?: unknown };
+  };
+  usage.calls++;
+  if (typeof body.usage?.prompt_tokens === 'number') usage.promptTokens += body.usage.prompt_tokens;
+  if (typeof body.usage?.completion_tokens === 'number') usage.completionTokens += body.usage.completion_tokens;
   const choice = body.choices?.[0];
   if (choice?.finish_reason === 'length') throw new Error(`${model} の出力が上限 ${MAX_TOKENS} トークンで切れました`);
   const content = choice?.message?.content;

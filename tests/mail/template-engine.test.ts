@@ -198,7 +198,7 @@ describe('取得元の状態', () => {
     const data = buildTemplateData(mockArticles, [], DATE, health);
     for (const name of ['digest-text', 'digest']) {
       const out = renderTemplate(name, data);
-      expect(out).toContain('取得元の状態');
+      expect(out).toContain('配信の状態');
       expect(out).toContain('Anthropic Blog は 2025年11月24日 から更新がありません');
     }
   });
@@ -206,7 +206,7 @@ describe('取得元の状態', () => {
   it('問題の無い日はフッターに何も出さない', () => {
     const data = buildTemplateData(mockArticles, [], DATE);
     expect(data.sourceNotes).toEqual([]);
-    for (const name of ['digest-text', 'digest']) expect(renderTemplate(name, data)).not.toContain('取得元の状態');
+    for (const name of ['digest-text', 'digest']) expect(renderTemplate(name, data)).not.toContain('配信の状態');
   });
 });
 
@@ -221,5 +221,25 @@ describe('差分の無い要約', () => {
     expect(text).not.toContain('差分:');
     expect(html).toContain('pnpm 11 の解説記事。');
     expect(html).not.toContain('>差分<');
+  });
+});
+
+describe('要約の状態（黙った劣化を受信箱で分かるようにする）', () => {
+  it('要約できなかった記事の件数とトレンドの失敗を、配信の状態の行にする', () => {
+    const data = buildTemplateData(mockArticles, [], DATE, { stale: [], failed: [], summaryMissing: 7, trendFailed: true });
+    expect(data.sourceNotes).toEqual([
+      '要約できなかった記事が 7 件あります（本文の抜粋を載せています）',
+      'トレンドを作れませんでした',
+    ]);
+  });
+
+  it('要約がすべて取れた日は何も出さない', () => {
+    const data = buildTemplateData(mockArticles, mockTrends, DATE, { stale: [], failed: [], summaryMissing: 0, trendFailed: false });
+    expect(data.sourceNotes).toEqual([]);
+  });
+
+  it('フッターの見出しは「配信の状態」', () => {
+    const data = buildTemplateData(mockArticles, [], DATE, { stale: [], failed: [], summaryMissing: 1 });
+    for (const name of ['digest-text', 'digest']) expect(renderTemplate(name, data)).toContain('配信の状態');
   });
 });

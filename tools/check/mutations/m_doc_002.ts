@@ -13,6 +13,6 @@ export default {
   title: "コードの主モデルだけを替える",
   touches: ["src/ai/client.ts"],
   async apply(ws) {
-    await replaceOnce(ws, "src/ai/client.ts", "export const PRIMARY_MODEL = 'seed-2-0-lite-260428';", "export const PRIMARY_MODEL = 'seed-2-0-mini-260428';");
+    await replaceOnce(ws, "src/ai/client.ts", "export const PRIMARY_MODEL = 'seed-2-0-lite-260428';", "export const PRIMARY_MODEL = 'seed-2-0-pro-260328';");
   },
 } satisfies Mutation;
